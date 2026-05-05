@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <RootNamespace>SimdJson.Net.Tests</RootNamespace>
+    <AssemblyName>SimdJson.Net.Tests</AssemblyName>
+    <IsPackable>false</IsPackable>
+    <OutputType>Exe</OutputType>
+    <!-- TUnit ships its own test runner so we don't need vstest's Microsoft.NET.Test.Sdk -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="TUnit" />
+    <PackageReference Include="TUnit.Assertions" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\SimdJson.Net\SimdJson.Net.csproj" />
+  </ItemGroup>
+
+</Project>

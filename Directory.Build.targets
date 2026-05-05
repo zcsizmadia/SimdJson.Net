@@ -1,0 +1,5 @@
+<Project>
+  <PropertyGroup>
+    <!-- Library-only defaults; tests/benches override -->
+  </PropertyGroup>
+</Project>
