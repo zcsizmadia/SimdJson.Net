@@ -1,3 +1,4 @@
+using System.Runtime.Intrinsics.X86;
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Jobs;
 
@@ -17,8 +18,6 @@ namespace SimdJson.Net.Benchmarks;
 [MemoryDiagnoser]
 [CategoriesColumn]
 [GroupBenchmarksBy(BenchmarkDotNet.Configs.BenchmarkLogicalGroupRule.ByCategory)]
-[SimpleJob(RuntimeMoniker.Net80)]
-[SimpleJob(RuntimeMoniker.Net90)]
 public class ParseBenchmarks
 {
     private byte[] _utf8 = null!;
@@ -58,11 +57,16 @@ public class ParseBenchmarks
     }
 
     // -- SimdJsonSharp (managed C#) -------------------------------------
+    // Requires AVX2. On hardware without AVX2 the call would throw a
+    // PlatformNotSupportedException; we guard it and return -1 so the row
+    // is preserved but obviously meaningless. Filter it out with
+    // --anyCategories Net to skip on non-AVX2 boxes.
 
     [Benchmark]
     [BenchmarkCategory("Small", "Medium", "Large", "VLarge", "XLarge")]
     public unsafe long SimdJsonSharp_Managed()
     {
+        if (!Avx2.IsSupported) return -1;
         long count = 0;
         fixed (byte* p = _utf8)
         {

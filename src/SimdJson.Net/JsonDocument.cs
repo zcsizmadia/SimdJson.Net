@@ -95,6 +95,8 @@ public sealed class JsonDocument : IDisposable
         _disposed = true;
         if (_rentedInput is not null)
             ArrayPool<byte>.Shared.Return(_rentedInput);
+        ArrayPool<long>.Shared.Return(_tape);
+        ArrayPool<byte>.Shared.Return(_stringBuffer);
         GC.SuppressFinalize(this);
     }
 }

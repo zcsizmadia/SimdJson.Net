@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Buffers.Text;
 using System.Runtime.CompilerServices;
 using System.Text;
@@ -40,8 +41,10 @@ internal sealed class TapeBuilder
         _inputLength = inputLength;
         _structurals = structurals;
         _structuralCount = structuralCount;
-        _tape = new long[Math.Max(16, structuralCount * 2 + 16)];
-        _stringBuffer = new byte[Math.Max(64, inputLength + 32)];
+        // Tape needs at most ~1.1x structural count slots (numbers take 2).
+        _tape = ArrayPool<long>.Shared.Rent(Math.Max(16, structuralCount + (structuralCount >> 2) + 16));
+        // Decoded strings are at most as long as the raw input (escapes shrink).
+        _stringBuffer = ArrayPool<byte>.Shared.Rent(Math.Max(64, inputLength + 32));
     }
 
     public long[] Tape => _tape;
@@ -71,14 +74,24 @@ internal sealed class TapeBuilder
     private void EnsureTape(int extra)
     {
         if (_tapeIndex + extra > _tape.Length)
-            Array.Resize(ref _tape, Math.Max(_tape.Length * 2, _tapeIndex + extra));
+        {
+            var bigger = ArrayPool<long>.Shared.Rent(Math.Max(_tape.Length * 2, _tapeIndex + extra));
+            Array.Copy(_tape, bigger, _tapeIndex);
+            ArrayPool<long>.Shared.Return(_tape);
+            _tape = bigger;
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private void EnsureStringBuffer(int extra)
     {
         if (_stringBufferIndex + extra > _stringBuffer.Length)
-            Array.Resize(ref _stringBuffer, Math.Max(_stringBuffer.Length * 2, _stringBufferIndex + extra));
+        {
+            var bigger = ArrayPool<byte>.Shared.Rent(Math.Max(_stringBuffer.Length * 2, _stringBufferIndex + extra));
+            Array.Copy(_stringBuffer, bigger, _stringBufferIndex);
+            ArrayPool<byte>.Shared.Return(_stringBuffer);
+            _stringBuffer = bigger;
+        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -191,60 +204,67 @@ internal sealed class TapeBuilder
         _tape[startTape] = Encode(JsonElementType.Array, _tapeIndex);
     }
 
+    private static ReadOnlySpan<byte> StringTerminators => "\"\\"u8;
+    private static ReadOnlySpan<byte> NumberTerminators => " \t\r\n,}]"u8;
+
     private void ParseString(ref int idx)
     {
         int pos = _structurals[idx];
-        // pos points at the opening quote. Find the closing unescaped quote
-        // by walking the next bytes (kept simple here; the SIMD pipeline
-        // already located it via the in-string mask).
         int start = pos + 1;
-        int p = start;
-        EnsureStringBuffer(_inputLength - p + 1);
+        EnsureStringBuffer(_inputLength - start + 1);
         int writeStart = _stringBufferIndex;
 
-        while (p < _inputLength)
+        ReadOnlySpan<byte> input = _input.AsSpan(0, _inputLength);
+        int p = start;
+
+        while (true)
         {
-            byte c = _input[p];
+            // Bulk-scan the run of plain bytes up to the next " or \.
+            int rel = input[p..].IndexOfAny(StringTerminators);
+            if (rel < 0) throw SimdJsonException.Truncated();
+
+            // Bulk-copy the plain run.
+            if (rel > 0)
+            {
+                input.Slice(p, rel).CopyTo(_stringBuffer.AsSpan(_stringBufferIndex));
+                _stringBufferIndex += rel;
+                p += rel;
+            }
+
+            byte c = input[p];
             if (c == (byte)'"')
             {
                 int len = _stringBufferIndex - writeStart;
-                _stringBuffer[_stringBufferIndex++] = 0; // NUL terminator (cheap C-style guard)
-                // Encode: high byte = String, low 32 bits = offset, next 24 = length
                 long payload = ((long)len << 32) | (uint)writeStart;
                 Write(JsonElementType.String, payload);
                 idx++;
                 return;
             }
-            if (c == (byte)'\\')
+
+            // c == '\\'
+            if (p + 1 >= _inputLength) throw SimdJsonException.Truncated();
+            byte esc = input[p + 1];
+            switch (esc)
             {
-                if (p + 1 >= _inputLength) throw SimdJsonException.Truncated();
-                byte esc = _input[p + 1];
-                switch (esc)
-                {
-                    case (byte)'"':  _stringBuffer[_stringBufferIndex++] = (byte)'"';  p += 2; break;
-                    case (byte)'\\': _stringBuffer[_stringBufferIndex++] = (byte)'\\'; p += 2; break;
-                    case (byte)'/':  _stringBuffer[_stringBufferIndex++] = (byte)'/';  p += 2; break;
-                    case (byte)'b':  _stringBuffer[_stringBufferIndex++] = 0x08; p += 2; break;
-                    case (byte)'f':  _stringBuffer[_stringBufferIndex++] = 0x0C; p += 2; break;
-                    case (byte)'n':  _stringBuffer[_stringBufferIndex++] = 0x0A; p += 2; break;
-                    case (byte)'r':  _stringBuffer[_stringBufferIndex++] = 0x0D; p += 2; break;
-                    case (byte)'t':  _stringBuffer[_stringBufferIndex++] = 0x09; p += 2; break;
-                    case (byte)'u':
-                        if (p + 6 > _inputLength) throw SimdJsonException.Truncated();
-                        int cp = ParseHex4(_input.AsSpan(p + 2, 4));
-                        EnsureStringBuffer(4);
-                        _stringBufferIndex += EncodeUtf8(cp, _stringBuffer.AsSpan(_stringBufferIndex));
-                        p += 6;
-                        break;
-                    default:
-                        throw new SimdJsonException($"Invalid escape '\\{(char)esc}' at offset {p}.");
-                }
-                continue;
+                case (byte)'"':  _stringBuffer[_stringBufferIndex++] = (byte)'"';  p += 2; break;
+                case (byte)'\\': _stringBuffer[_stringBufferIndex++] = (byte)'\\'; p += 2; break;
+                case (byte)'/':  _stringBuffer[_stringBufferIndex++] = (byte)'/';  p += 2; break;
+                case (byte)'b':  _stringBuffer[_stringBufferIndex++] = 0x08; p += 2; break;
+                case (byte)'f':  _stringBuffer[_stringBufferIndex++] = 0x0C; p += 2; break;
+                case (byte)'n':  _stringBuffer[_stringBufferIndex++] = 0x0A; p += 2; break;
+                case (byte)'r':  _stringBuffer[_stringBufferIndex++] = 0x0D; p += 2; break;
+                case (byte)'t':  _stringBuffer[_stringBufferIndex++] = 0x09; p += 2; break;
+                case (byte)'u':
+                    if (p + 6 > _inputLength) throw SimdJsonException.Truncated();
+                    int cp = ParseHex4(input.Slice(p + 2, 4));
+                    EnsureStringBuffer(4);
+                    _stringBufferIndex += EncodeUtf8(cp, _stringBuffer.AsSpan(_stringBufferIndex));
+                    p += 6;
+                    break;
+                default:
+                    throw new SimdJsonException($"Invalid escape '\\{(char)esc}' at offset {p}.");
             }
-            _stringBuffer[_stringBufferIndex++] = c;
-            p++;
         }
-        throw SimdJsonException.Truncated();
     }
 
     private void ParseLiteral(ref int idx, ReadOnlySpan<byte> expected, JsonElementType tag)
@@ -262,18 +282,11 @@ internal sealed class TapeBuilder
     private void ParseNumber(ref int idx)
     {
         int pos = _structurals[idx];
-        // Find end of number (next structural or whitespace)
-        int end = pos;
-        while (end < _inputLength)
-        {
-            byte c = _input[end];
-            if (c is (byte)' ' or (byte)'\t' or (byte)'\n' or (byte)'\r'
-                or (byte)',' or (byte)'}' or (byte)']')
-                break;
-            end++;
-        }
+        ReadOnlySpan<byte> input = _input.AsSpan(0, _inputLength);
+        int rel = input[pos..].IndexOfAny(NumberTerminators);
+        int end = rel < 0 ? _inputLength : pos + rel;
 
-        ReadOnlySpan<byte> slice = _input.AsSpan(pos, end - pos);
+        ReadOnlySpan<byte> slice = input.Slice(pos, end - pos);
         bool isFloat = ContainsFloatChar(slice);
 
         if (!isFloat
