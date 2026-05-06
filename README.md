@@ -3,7 +3,6 @@
 A high-performance .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v4.6.3, exposing the On-Demand API via a thin C ABI bridge.
 
 - **`SimdJson.Net`** — idiomatic C# API: `SimdJsonParser`, `JsonDocument`, `JsonValue`, `JsonArray`, `JsonObject`
-- **`SimdJson.Net.Runtimes`** — native runtime assets (`SimdJsonNative.dll/.so/.dylib`) for each supported platform RID
 
 All native binaries are compiled from source via GitHub Actions — transparent, reproducible, and auditable.
 
@@ -51,10 +50,7 @@ Console.WriteLine(SimdJsonParser.GetVersion()); // e.g. "4.6.3"
 
 ```bash
 dotnet add package SimdJson.Net
-dotnet add package SimdJson.Net.Runtimes
 ```
-
-> `SimdJson.Net.Runtimes` is a separate package that ships the native `SimdJsonNative` shared library for each supported Runtime Identifier.
 
 ## API Reference
 
@@ -132,7 +128,6 @@ Thrown on any native error. `ErrorCode` holds the raw bridge error code.
 | RID | Platform |
 |-----|----------|
 | `win-x64` | Windows x64 |
-| `win-x86` | Windows x86 |
 | `win-arm64` | Windows ARM64 |
 | `linux-x64` | Linux glibc x64 |
 | `linux-arm64` | Linux glibc ARM64 |
@@ -146,7 +141,7 @@ Thrown on any native error. `ErrorCode` holds the raw bridge error code.
 The native `SimdJsonNative` shared library wraps [simdjson](https://github.com/simdjson/simdjson) by Daniel Lemire and contributors, licensed under Apache 2.0. This package is an independent .NET distribution; all simdjson rights belong to the original authors.
 
 - Upstream: https://github.com/simdjson/simdjson
-- This repository: https://github.com/zcsizmadia/SimdJson.Net.Runtimes
+- This repository: https://github.com/zcsizmadia/SimdJson.Net
 
 ## License
 
