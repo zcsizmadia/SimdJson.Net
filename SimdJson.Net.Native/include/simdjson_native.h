@@ -556,6 +556,106 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentRawJsonToken(
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseAllowIncompleteJson(
     SimdJsonParser parser, const char* json, size_t length, SimdJsonDocument* out_doc);
 
+// ─── Raw JSON string (without unescaping) ────────────────────────────────────
+
+/**
+ * Returns the raw (still-escaped) bytes of a JSON string value, without the
+ * surrounding quote characters. For example, the JSON value "hello\nworld"
+ * yields bytes [h,e,l,l,o,\,n,w,o,r,l,d] (backslash + n, not a newline).
+ * The pointer is valid for the lifetime of the owning document.
+ * Fails with SIMDJSON_BRIDGE_ERR_INCORRECT_TYPE if the value is not a string.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetRawJsonString(
+    SimdJsonValue value, const char** out_ptr, size_t* out_len);
+
+// ─── Wildcard path iteration ──────────────────────────────────────────────────
+
+/**
+ * Callback invoked for each value matching a JSONPath wildcard expression.
+ * The borrowed_value handle is valid ONLY for the duration of the callback;
+ * the caller must NOT destroy it (it is stack-allocated in the bridge).
+ * context is the user-data pointer passed to SimdJsonNative_DocumentForEachAtPath /
+ * SimdJsonNative_ValueForEachAtPath.
+ */
+typedef void (SJNATIVE_CALL *SimdJsonWildcardCallback)(void* borrowed_value, void* context);
+
+/**
+ * Iterates over all values matching json_path (e.g. "$.items[*]") starting from the
+ * document root and calls callback for each match.
+ * path_len is the byte length of the UTF-8 path string (without null terminator).
+ * The document is rewound before iteration.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentForEachAtPath(
+    SimdJsonDocument doc, const char* path, size_t path_len,
+    SimdJsonWildcardCallback callback, void* context);
+
+/**
+ * Iterates over all values matching json_path starting from a value (which must be
+ * an array or object) and calls callback for each match.
+ * path_len is the byte length of the UTF-8 path string (without null terminator).
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueForEachAtPath(
+    SimdJsonValue value, const char* path, size_t path_len,
+    SimdJsonWildcardCallback callback, void* context);
+
+/** Iterates over all values matching json_path starting from an array. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayForEachAtPath(
+    SimdJsonArray array, const char* path, size_t path_len,
+    SimdJsonWildcardCallback callback, void* context);
+
+/** Iterates over all values matching json_path starting from an object. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectForEachAtPath(
+    SimdJsonObject object, const char* path, size_t path_len,
+    SimdJsonWildcardCallback callback, void* context);
+
+// ─── Document scalar getters ──────────────────────────────────────────────────
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetString(
+    SimdJsonDocument doc, const char** out_ptr, size_t* out_len);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetStringAllowReplacement(
+    SimdJsonDocument doc, const char** out_ptr, size_t* out_len);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetBool(
+    SimdJsonDocument doc, int32_t* out_val);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentIsNull(
+    SimdJsonDocument doc, int32_t* out_is_null);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetDouble(
+    SimdJsonDocument doc, double* out_val);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetInt64(
+    SimdJsonDocument doc, int64_t* out_val);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetUInt64(
+    SimdJsonDocument doc, uint64_t* out_val);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetDoubleInString(
+    SimdJsonDocument doc, double* out_val);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetInt64InString(
+    SimdJsonDocument doc, int64_t* out_val);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetUInt64InString(
+    SimdJsonDocument doc, uint64_t* out_val);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentCountElements(
+    SimdJsonDocument doc, size_t* out_count);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentCountFields(
+    SimdJsonDocument doc, size_t* out_count);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentAt(
+    SimdJsonDocument doc, size_t index, SimdJsonValue* out_value);
+
+// ─── Value count_elements / count_fields ─────────────────────────────────────
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueCountElements(
+    SimdJsonValue value, size_t* out_count);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueCountFields(
+    SimdJsonValue value, size_t* out_count);
+
+// ─── Native int32 / uint32 getters ───────────────────────────────────────────
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetInt32(
+    SimdJsonValue value, int32_t* out_val);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetUInt32(
+    SimdJsonValue value, uint32_t* out_val);
+
+// ─── String with allow_replacement ───────────────────────────────────────────
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetStringAllowReplacement(
+    SimdJsonValue value, const char** out_ptr, size_t* out_len);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

@@ -84,6 +84,7 @@ The `Samples/` folder contains runnable console projects, each demonstrating a d
 | [08-ErrorHandling](Samples/08-ErrorHandling/Program.cs) | `SimdJsonException` error codes, lazy On-Demand parse errors, `TryXxx` non-throwing API, `ParseAllowIncompleteJson` |
 | [09-RealWorld-GeoJson](Samples/09-RealWorld-GeoJson/Program.cs) | GeoJSON FeatureCollection — nested objects/arrays, bounding-box calculation, On-Demand forward-iteration discipline |
 | [10-RealWorld-LogParser](Samples/10-RealWorld-LogParser/Program.cs) | NDJSON log stream — parser reuse across lines, aggregation, `TryGetField` for optional fields |
+| [11-WildcardAndRawString](Samples/11-WildcardAndRawString/Program.cs) | `ForEachAtPath` wildcard JSONPath iteration; `GetRawJsonString`/`GetRawJsonStringSpan` for escaped-byte access |
 
 > **On-Demand iteration tip**: simdjson On-Demand is a forward-only streaming parser. Always fully consume a nested object or array before accessing the next sibling field in its parent. See samples 09 and 10 for patterns.
 

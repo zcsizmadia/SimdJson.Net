@@ -78,13 +78,13 @@ jobs:
         shell: bash
         run: |
           dotnet nuget push "$TARGET_NUPKG" \
-            --api-key ${{ secrets.NUGET_API_KEY }} \
+            --api-key "${{ secrets.NUGET_API_KEY }}" \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
 
       - name: Publish to GitHub Packages
         run: |
           dotnet nuget push "$TARGET_NUPKG" \
-            --api-key ${{ secrets.GITHUB_TOKEN }} \
+            --api-key "${{ secrets.GITHUB_TOKEN }}" \
             --source "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json" \
             --skip-duplicate

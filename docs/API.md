@@ -83,3 +83,94 @@ SimdJsonParser.GetVersion();           // "4.6.3"
 SimdJsonParser.Minify(json);
 SimdJsonParser.ValidateUtf8(bytes);
 ```
+
+### Raw JSON string
+
+```csharp
+using var val = doc.GetField("key");
+val.GetRawJsonString();      // escaped bytes as string, no surrounding quotes
+val.GetRawJsonStringSpan();  // same, zero-allocation ReadOnlySpan<byte>
+// "hello\nworld" in JSON → GetRawJsonString() returns @"hello\nworld" (backslash-n)
+// GetString() returns "hello\nworld" (real newline)
+```
+
+### GetRawJsonSpan on containers
+
+```csharp
+using var arr = val.GetArray();
+ReadOnlySpan<byte> raw = arr.GetRawJsonSpan();   // e.g. [1,2,3]
+
+using var obj = val.GetObject();
+ReadOnlySpan<byte> raw = obj.GetRawJsonSpan();   // e.g. {"a":1}
+
+ReadOnlySpan<byte> raw = doc.GetRawJsonSpan();   // whole document
+```
+
+### Counting elements and fields
+
+```csharp
+// On a document
+int n = doc.CountElements();   // root array: count elements (full scan)
+int n = doc.CountFields();     // root object: count fields  (full scan)
+
+// On a value
+int n = val.CountElements();   // value must be an array
+int n = val.CountFields();     // value must be an object
+```
+
+> **Note:** counting requires a full forward scan. After calling `CountElements`/`CountFields` the iterator is exhausted. Call `Rewind()` on the document to reset.
+
+### Document scalar getters
+
+```csharp
+// Use when the root of the document is a bare scalar
+string  s = doc.GetString();
+bool    b = doc.GetBool();
+bool    n = doc.IsNull();
+double  d = doc.GetDouble();
+long    i = doc.GetInt64();
+ulong   u = doc.GetUInt64();
+
+// Numbers stored as JSON strings
+long   i = doc.GetInt64InString();
+ulong  u = doc.GetUInt64InString();
+double d = doc.GetDoubleInString();
+
+// Direct element access on a root array
+using var val = doc.At(2);   // 0-based index
+```
+
+### 32-bit integers
+
+```csharp
+int  i = val.GetInt32();             // throws if not int32 or overflow
+uint u = val.GetUInt32();            // throws if not uint32 or overflow
+val.TryGetInt32(out int  v);         // returns false on type mismatch or overflow
+val.TryGetUInt32(out uint v);        // returns false on type mismatch or overflow
+```
+
+### Wildcard path iteration
+
+```csharp
+// Visit every element of an array
+doc.ForEachAtPath("$[*]", v => Console.WriteLine(v.GetInt64()));
+
+// Extract one field from each object in an array
+doc.ForEachAtPath("$.items[*].name", v => Console.WriteLine(v.GetString()));
+
+// Visit all field values of an object
+doc.ForEachAtPath("$.*", v => Console.WriteLine(v.GetDouble()));
+
+// Start from a value instead of the document root
+using var arrVal = doc.GetField("data");
+arrVal.ForEachAtPath("$[*]", v => results.Add(v.GetString()));
+
+// Start from an array or object handle
+using var arr = val.GetArray();
+arr.ForEachAtPath("$[*]", v => results.Add(v.GetInt64()));
+
+using var obj = val.GetObject();
+obj.ForEachAtPath("$.*", v => results.Add(v.GetString()));
+```
+
+> The `JsonValue` passed to the callback is **borrowed**: valid only during the callback invocation. Do not dispose or store it.

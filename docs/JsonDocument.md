@@ -47,9 +47,53 @@ Call `Rewind()` when you need to access the document more than once (e.g. read o
 | Member | Description |
 |--------|-------------|
 | `GetRawJson()` | Full raw JSON of the document root as a `string` |
+| `GetRawJsonSpan()` | Full raw JSON as a zero-allocation `ReadOnlySpan<byte>` |
 | `GetWobblyStringSpan()` | Root string as WTF-8 `ReadOnlySpan<byte>` (allows lone surrogates) |
 | `CurrentOffset()` | Byte offset of the current parse position from the document start |
 | `CurrentDepth()` | Current JSON nesting depth (`0` = root level) |
+
+## Root scalar getters
+
+Use when the JSON document root is a bare scalar value (e.g. `"hello"`, `42`, `true`, `null`).
+
+| Member | Description |
+|--------|-------------|
+| `GetString()` | Root as `string` (rejects lone surrogates) |
+| `GetString(bool allowReplacement)` | Root as `string`; `allowReplacement: true` replaces lone surrogates with U+FFFD |
+| `GetStringSpan()` | Root as UTF-8 `ReadOnlySpan<byte>`, zero-allocation |
+| `GetBool()` | Root as `bool` |
+| `IsNull()` | `true` when the root is `null` |
+| `GetDouble()` | Root as `double` |
+| `GetInt64()` | Root as `long` |
+| `GetUInt64()` | Root as `ulong` |
+| `GetDoubleInString()` | Parse a `double` out of a root JSON string (e.g. `"3.14"`) |
+| `GetInt64InString()` | Parse a `long` out of a root JSON string (e.g. `"-99"`) |
+| `GetUInt64InString()` | Parse a `ulong` out of a root JSON string (e.g. `"100"`) |
+| `At(int index)` | Element at 0-based `index` when root is an array — returns a `JsonValue` that must be disposed |
+
+## Counting
+
+| Member | Description |
+|--------|-------------|
+| `CountElements()` | Number of elements when root is an array (full scan, exhausts iterator) |
+| `CountFields()` | Number of fields when root is an object (full scan, exhausts iterator) |
+
+> After calling `CountElements`/`CountFields` the iterator is exhausted. Call `Rewind()` to reset.
+
+## Wildcard path iteration
+
+| Member | Description |
+|--------|-------------|
+| `ForEachAtPath(string path, Action<JsonValue> callback)` | Invoke `callback` for each value matching a JSONPath wildcard expression. The document is rewound automatically before iteration. The `JsonValue` passed to the callback is **borrowed** — valid only during the callback, must not be disposed or stored. |
+
+Supported path patterns:
+
+| Pattern | Matches |
+|---------|---------|
+| `$[*]` | Every element of the root array |
+| `$.*` | Every field value of the root object |
+| `$.items[*]` | Every element of the `items` array |
+| `$.items[*].name` | The `name` field of every element in `items` |
 
 ## Examples
 

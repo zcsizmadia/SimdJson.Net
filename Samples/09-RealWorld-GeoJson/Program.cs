@@ -72,8 +72,15 @@ foreach (var feature in features)
         int ci = 0;
         foreach (var c in coords)
         {
-            if (ci == 0) featureLon = c.GetDouble();
-            else if (ci == 1) featureLat = c.GetDouble();
+            if (ci == 0)
+            {
+                featureLon = c.GetDouble();
+            }
+            else if (ci == 1)
+            {
+                featureLat = c.GetDouble();
+            }
+
             c.Dispose();
             ci++;
         }
@@ -89,8 +96,15 @@ foreach (var feature in features)
             int ci = 0;
             foreach (var c in pairArr)
             {
-                if (ci == 0) lon = c.GetDouble();
-                else if (ci == 1) lat = c.GetDouble();
+                if (ci == 0)
+                {
+                    lon = c.GetDouble();
+                }
+                else if (ci == 1)
+                {
+                    lat = c.GetDouble();
+                }
+
                 c.Dispose();
                 ci++;
             }
@@ -118,7 +132,10 @@ foreach (var feature in features)
         maxLon = Math.Max(maxLon, featureLon);
         minLat = Math.Min(minLat, featureLat);
         maxLat = Math.Max(maxLat, featureLat);
-        if (cat == "landmark") landmarks.Add(featureName);
+        if (cat == "landmark")
+        {
+            landmarks.Add(featureName);
+        }
     }
     else
     {
@@ -144,5 +161,6 @@ Console.WriteLine($"  NE: ({maxLon:F4}, {maxLat:F4})");
 Console.WriteLine();
 Console.WriteLine($"Landmarks ({landmarks.Count}):");
 foreach (var lm in landmarks)
+{
     Console.WriteLine($"  - {lm}");
-
+}

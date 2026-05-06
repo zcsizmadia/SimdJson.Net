@@ -32,9 +32,17 @@ public sealed class SimdJsonParser : IDisposable
     public static unsafe string GetVersion()
     {
         byte* p = NativeMethods.GetVersion();
-        if (p == null) return string.Empty;
+        if (p == null)
+        {
+            return string.Empty;
+        }
+
         int len = 0;
-        while (p[len] != 0) len++;
+        while (p[len] != 0)
+        {
+            len++;
+        }
+
         return System.Text.Encoding.UTF8.GetString(p, len);
     }
 
@@ -43,7 +51,9 @@ public sealed class SimdJsonParser : IDisposable
     {
         _handle = NativeMethods.CreateParser();
         if (_handle == 0)
+        {
             throw new InvalidOperationException("Failed to create native SimdJson parser.");
+        }
     }
 
     /// <summary>
@@ -57,7 +67,9 @@ public sealed class SimdJsonParser : IDisposable
     {
         _handle = NativeMethods.CreateParserWithCapacity(maxCapacity);
         if (_handle == 0)
+        {
             throw new InvalidOperationException("Failed to create native SimdJson parser.");
+        }
     }
 
     /// <summary>
@@ -113,7 +125,9 @@ public sealed class SimdJsonParser : IDisposable
         nint docHandle;
         int err;
         fixed (byte* p = utf8Json)
+        {
             err = NativeMethods.Parse(_handle, p, (nuint)utf8Json.Length, out docHandle);
+        }
 
         SimdJsonException.ThrowIfError(err);
         return new JsonDocument(docHandle);
@@ -142,7 +156,9 @@ public sealed class SimdJsonParser : IDisposable
         finally
         {
             if (rented is not null)
+            {
                 System.Buffers.ArrayPool<byte>.Shared.Return(rented);
+            }
         }
     }
 
@@ -179,7 +195,9 @@ public sealed class SimdJsonParser : IDisposable
         nint docHandle;
         int err;
         fixed (byte* p = utf8Json)
+        {
             err = NativeMethods.ParseAllowIncompleteJson(_handle, p, (nuint)utf8Json.Length, out docHandle);
+        }
 
         SimdJsonException.ThrowIfError(err);
         return new JsonDocument(docHandle);
@@ -207,13 +225,19 @@ public sealed class SimdJsonParser : IDisposable
         finally
         {
             if (rented is not null)
+            {
                 System.Buffers.ArrayPool<byte>.Shared.Return(rented);
+            }
         }
     }
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+        {
+            return;
+        }
+
         _disposed = true;
         NativeMethods.DestroyParser(_handle);
         _handle = 0;
@@ -257,7 +281,11 @@ public sealed class SimdJsonParser : IDisposable
     /// <returns>A new byte array containing the minified UTF-8 JSON.</returns>
     public static unsafe byte[] MinifyUtf8(ReadOnlySpan<byte> utf8Json)
     {
-        if (utf8Json.IsEmpty) return [];
+        if (utf8Json.IsEmpty)
+        {
+            return [];
+        }
+
         byte[] outputBuf = System.Buffers.ArrayPool<byte>.Shared.Rent(utf8Json.Length);
         try
         {
@@ -281,7 +309,11 @@ public sealed class SimdJsonParser : IDisposable
     /// </summary>
     public static unsafe bool ValidateUtf8(ReadOnlySpan<byte> bytes)
     {
-        if (bytes.IsEmpty) return true;
+        if (bytes.IsEmpty)
+        {
+            return true;
+        }
+
         fixed (byte* p = bytes)
         {
             return NativeMethods.ValidateUtf8(p, (nuint)bytes.Length) != 0;

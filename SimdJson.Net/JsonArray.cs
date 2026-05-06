@@ -1,4 +1,5 @@
 using System.Collections;
+using System.Runtime.InteropServices;
 using SimdJson.Internal;
 
 namespace SimdJson;
@@ -43,7 +44,11 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
             while (true)
             {
                 SimdJsonException.ThrowIfError(NativeMethods.ArrayIterNext(iter, out nint valHandle, out int done));
-                if (done != 0) yield break;
+                if (done != 0)
+                {
+                    yield break;
+                }
+
                 yield return new JsonValue(valHandle, _owner);
             }
         }
@@ -72,9 +77,14 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
                 SimdJsonException.ThrowIfError(
                     NativeMethods.ArrayIterNext(iter, out nint valHandle, out int done));
                 if (done != 0)
+                {
                     throw new SimdJsonException(-4); // index out of bounds
+                }
+
                 if (i == index)
+                {
                     return new JsonValue(valHandle, _owner);
+                }
                 // Discard intermediate elements
                 NativeMethods.DestroyValue(valHandle);
             }
@@ -107,6 +117,17 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
         ObjectDisposedException.ThrowIf(_disposed, this);
         SimdJsonException.ThrowIfError(NativeMethods.ArrayRawJson(Handle, out byte* ptr, out nuint len));
         return System.Text.Encoding.UTF8.GetString(ptr, (int)len);
+    }
+
+    /// <summary>
+    /// Returns the full raw JSON of this array as a <see cref="ReadOnlySpan{T}"/> without allocating a string.
+    /// This operation consumes the array iterator; call <see cref="Reset"/> to iterate again.
+    /// </summary>
+    public unsafe ReadOnlySpan<byte> GetRawJsonSpan()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ArrayRawJson(Handle, out byte* ptr, out nuint len));
+        return new ReadOnlySpan<byte>(ptr, (int)len);
     }
 
     /// <summary>Resets the array iterator so the array can be traversed again.</summary>
@@ -179,9 +200,40 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
         catch (SimdJsonException) { value = null; return false; }
     }
 
+    /// <summary>
+    /// Iterates over all values in this array that match the given JSONPath wildcard expression
+    /// (e.g. <c>"$[*]"</c>, <c>"$[*].name"</c>) and invokes <paramref name="callback"/> for each match.
+    /// </summary>
+    /// <remarks>
+    /// The <see cref="JsonValue"/> passed to <paramref name="callback"/> is borrowed —
+    /// valid only during the callback, must not be disposed or stored.
+    /// </remarks>
+    public unsafe void ForEachAtPath(string path, Action<JsonValue> callback)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(callback);
+        int maxBytes = System.Text.Encoding.UTF8.GetMaxByteCount(path.Length);
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = System.Text.Encoding.UTF8.GetBytes(path, buf);
+        var gcHandle = GCHandle.Alloc(callback);
+        try
+        {
+            fixed (byte* p = buf)
+            {
+                SimdJsonException.ThrowIfError(NativeMethods.ArrayForEachAtPath(
+                    Handle, p, (nuint)len, JsonValue.s_wildcardTrampolinePtr, GCHandle.ToIntPtr(gcHandle)));
+            }
+        }
+        finally { gcHandle.Free(); }
+    }
+
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+        {
+            return;
+        }
+
         _disposed = true;
         NativeMethods.DestroyArray(Handle);
         Handle = 0;
