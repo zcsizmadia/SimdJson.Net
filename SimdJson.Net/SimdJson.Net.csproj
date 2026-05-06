@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
+    <AssemblyName>SimdJson.Net</AssemblyName>
+    <RootNamespace>SimdJson</RootNamespace>
+    <IsPackable>true</IsPackable>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Authors>Zoltan Csizmadia</Authors>
+    <Owners>Zoltan Csizmadia</Owners>
+    <PackageId>SimdJson.Net</PackageId>
+    <PackageVersion>$(Version)</PackageVersion>
+    <Description>High-performance simdjson On-Demand JSON parser for .NET</Description>
+    <Copyright>Copyright © 2026 Zoltan Csizmadia</Copyright>
+    <RepositoryType>git</RepositoryType>
+    <RepositoryUrl>https://github.com/zcsizmadia/SimdJson.Net</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/zcsizmadia/SimdJson.Net</PackageProjectUrl>
+    <PackageTags>simdjson;json;simd;fast;parser;ondemand</PackageTags>
+    <PackageLicenseFile>LICENSE</PackageLicenseFile>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageReleaseNotes><a href="https://github.com/zcsizmadia/SimdJson.Net/releases">Release Notes</a></PackageReleaseNotes>
+    <PackageRequireLicenseAcceptance>false</PackageRequireLicenseAcceptance>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="../LICENSE" Pack="true" PackagePath="" />
+    <None Include="../README.md" Pack="true" PackagePath="" />
+    <None Include="runtimes/**" Pack="true" PackagePath="runtimes/" />
+  </ItemGroup>
+
+</Project>

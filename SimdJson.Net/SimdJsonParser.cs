@@ -1,0 +1,123 @@
+using System.Text;
+using SimdJson.Internal;
+
+namespace SimdJson;
+
+/// <summary>
+/// A reusable, thread-local-friendly simdjson On-Demand parser.
+/// One parser instance should be used per thread; it holds a growing internal buffer
+/// that is reused across <see cref="Parse"/> calls to avoid allocations.
+/// </summary>
+/// <remarks>
+/// Disposing releases the native parser handle. After disposal the instance must not
+/// be used. Use <see cref="SimdJsonParser.Shared"/> for a convenient thread-local instance.
+/// </remarks>
+public sealed class SimdJsonParser : IDisposable
+{
+    private nint _handle;
+    private bool _disposed;
+
+    [ThreadStatic]
+    private static SimdJsonParser? _shared;
+
+    /// <summary>
+    /// A thread-local <see cref="SimdJsonParser"/> instance.
+    /// Do not dispose this instance — it is owned by the thread.
+    /// </summary>
+    public static SimdJsonParser Shared => _shared ??= new SimdJsonParser();
+
+    /// <summary>
+    /// Returns the simdjson library version string (e.g. <c>"4.6.3"</c>).
+    /// </summary>
+    public static unsafe string GetVersion()
+    {
+        byte* p = NativeMethods.GetVersion();
+        if (p == null) return string.Empty;
+        int len = 0;
+        while (p[len] != 0) len++;
+        return System.Text.Encoding.UTF8.GetString(p, len);
+    }
+
+    /// <summary>Creates a new parser instance.</summary>
+    public SimdJsonParser()
+    {
+        _handle = NativeMethods.CreateParser();
+        if (_handle == 0)
+            throw new InvalidOperationException("Failed to create native SimdJson parser.");
+    }
+
+    /// <summary>
+    /// Parses a UTF-8 JSON span and returns an owning <see cref="JsonDocument"/>.
+    /// The document's lifetime is independent of this parser but only one document
+    /// may be in use per parser at a time (simdjson On-Demand constraint).
+    /// </summary>
+    public unsafe JsonDocument Parse(ReadOnlySpan<byte> utf8Json)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+
+        nint docHandle;
+        int err;
+        fixed (byte* p = utf8Json)
+            err = NativeMethods.Parse(_handle, p, (nuint)utf8Json.Length, out docHandle);
+
+        SimdJsonException.ThrowIfError(err);
+        return new JsonDocument(docHandle);
+    }
+
+    /// <summary>
+    /// Parses a UTF-16 .NET string by transcoding to UTF-8 on the stack/heap and
+    /// returning an owning <see cref="JsonDocument"/>.
+    /// </summary>
+    public JsonDocument Parse(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(json.Length);
+        byte[]? rented = null;
+
+        Span<byte> buffer = maxBytes <= 4096
+            ? stackalloc byte[maxBytes]
+            : (rented = System.Buffers.ArrayPool<byte>.Shared.Rent(maxBytes));
+
+        try
+        {
+            int written = Encoding.UTF8.GetBytes(json, buffer);
+            return Parse(buffer[..written]);
+        }
+        finally
+        {
+            if (rented is not null)
+                System.Buffers.ArrayPool<byte>.Shared.Return(rented);
+        }
+    }
+
+    /// <summary>
+    /// Parses a UTF-16 .NET string asynchronously (transcoding happens on a thread-pool thread).
+    /// </summary>
+    public Task<JsonDocument> ParseAsync(string json, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        // P/Invoke is CPU-bound and fast; offload to thread pool so the caller's thread is freed.
+        return Task.Run(() => Parse(json), cancellationToken);
+    }
+
+    /// <summary>
+    /// Reads all bytes from <paramref name="stream"/> and parses them as UTF-8 JSON.
+    /// </summary>
+    public async Task<JsonDocument> ParseAsync(Stream stream, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+
+        using var ms = new System.IO.MemoryStream();
+        await stream.CopyToAsync(ms, cancellationToken).ConfigureAwait(false);
+        return Parse(ms.GetBuffer().AsSpan(0, (int)ms.Length));
+    }
+
+    public void Dispose()
+    {
+        if (_disposed) return;
+        _disposed = true;
+        NativeMethods.DestroyParser(_handle);
+        _handle = 0;
+    }
+}

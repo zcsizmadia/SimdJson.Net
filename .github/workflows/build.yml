@@ -1,0 +1,225 @@
+name: Build
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # Build simdjson native libraries for all platforms in parallel.
+  build-simdjson:
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix: &platform-matrix
+        runtimeId: [win-x64, win-arm64, linux-x64, linux-arm64, linux-musl-x64, linux-musl-arm64, osx-x64, osx-arm64]
+        include:
+          - runtimeId: win-x64
+            os: windows-latest
+
+          - runtimeId: win-arm64
+            os: windows-11-arm
+
+          - runtimeId: linux-x64
+            os: ubuntu-latest
+
+          - runtimeId: linux-arm64
+            os: ubuntu-24.04-arm
+
+          - runtimeId: linux-musl-x64
+            os: ubuntu-latest
+            container: alpine:latest
+
+          - runtimeId: linux-musl-arm64
+            os: ubuntu-24.04-arm
+            container: alpine:latest
+
+          - runtimeId: osx-x64
+            os: macos-26-intel
+
+          - runtimeId: osx-arm64
+            os: macos-latest
+
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    name: build-simdjson (${{ matrix.runtimeId }})
+
+    steps:
+      # action/checkout fails on Alpine Arm64 without this fix
+      - name: Fix Alpine arm64 compatibility
+        if: matrix.runtimeId == 'linux-musl-arm64'
+        uses: laverdet/alpine-arm64@v1
+
+      - uses: actions/checkout@v6
+
+      # Install packages needed for building the native libraries.
+      - name: Install packages
+        shell: sh
+        run: |
+          uname -a
+          if [ -f /etc/alpine-release ]; then
+            apk add --no-cache \
+              build-base cmake git ninja curl zip unzip tar bash icu pkgconf patchelf linux-headers
+          fi
+
+      # Install .NET SDKs to extract the SimdJson version from the csproj file,
+      # which is used to ensure the vcpkg version matches and to determine
+      # the expected library file names.
+      - name: Install .NET SDKs
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            8.0.x
+            9.0.x
+            10.0.x
+
+      - name: Check SimdJson version
+        shell: bash
+        run: |
+          # Extract simdjson version from csproj
+          SIMDJSON_VERSION="$(dotnet msbuild SimdJson.Net/ -getProperty:SimdJsonVersion -nologo -v:q | tr -d '\r' | xargs)"
+          echo "SimdJson version from csproj: $SIMDJSON_VERSION"
+
+          echo "SIMDJSON_VERSION=$SIMDJSON_VERSION" | tee -a $GITHUB_ENV
+
+      - name: Build simdjson native library
+        shell: bash
+        run: |
+          cd SimdJsonNative
+          mkdir -p build/${{ matrix.runtimeId }}
+          # 1. MSVC is a multi-config generator; Release is selected at --build time.
+          # 2. Single-config generator (Makefiles / Ninja on Linux & macOS).
+          #    CMAKE_BUILD_TYPE must be set at configure time; --config is ignored.
+          cmake -S . -B build/${{ matrix.runtimeId }} -DCMAKE_BUILD_TYPE=Release
+          cmake --build build/${{ matrix.runtimeId }} --config Release
+
+      - name: Copy native library to runtimes
+        shell: bash
+        run: |
+          RUNTIMES_SRC_DIR="SimdJson.Net/runtimes/${{ matrix.runtimeId }}/native"
+          mkdir -p "$RUNTIMES_SRC_DIR"
+
+          case "${{ matrix.runtimeId }}" in
+            win*)
+              cp -L "SimdJsonNative/build/${{ matrix.runtimeId }}/Release/SimdJsonNative.dll" "$RUNTIMES_SRC_DIR/"
+              ;;
+            linux*)
+              cp -L "SimdJsonNative/build/${{ matrix.runtimeId }}/SimdJsonNative.so" "$RUNTIMES_SRC_DIR/"
+              ;;
+            osx*)
+              cp -L "SimdJsonNative/build/${{ matrix.runtimeId }}/SimdJsonNative.dylib" "$RUNTIMES_SRC_DIR/"
+              ;;
+            *)
+              echo "Unsupported runtime ID: ${{ matrix.runtimeId }}"
+              exit 1
+              ;;
+          esac
+
+      - name: Build .NET library
+        shell: bash
+        run: |
+          dotnet restore
+          dotnet build -c Release --no-restore
+
+      - name: Test
+        shell: bash
+        run: |
+          cd SimdJson.Net.Tests
+          dotnet test -c Release --no-build
+
+      - name: Upload native library artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: runtimes-${{ matrix.runtimeId }}
+          path: SimdJson.Net/runtimes
+
+  # Build NuGet package after all native libraries have been built successfully.
+  build-nupkg:
+    needs: [build-simdjson]
+    runs-on: ubuntu-latest
+    if: always() && needs.build-simdjson.result == 'success'
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Install .NET SDKs
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            10.0.x
+
+      - name: Download all native library artifacts
+        uses: actions/download-artifact@v8
+        with:
+          pattern: runtimes-*
+          path: SimdJson.Net/runtimes
+          merge-multiple: true
+
+      - name: Pack NuGet package
+        shell: bash
+        run: |
+          dotnet pack -c Release -o nupkgs
+
+      - name: Upload NuGet package artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: nuget-package
+          path: nupkgs/*.nupkg
+
+  # Validate the NuGet package by loading the native library on each supported runtime.
+  validate-nupkg:
+    needs: [build-nupkg]
+    if: always() && needs.build-nupkg.result == 'success'
+    strategy:
+      fail-fast: false
+      matrix: *platform-matrix
+
+    runs-on: ${{ matrix.os }}
+    container: ${{ matrix.container }}
+    name: validate-nupkg (${{ matrix.runtimeId }})
+
+    steps:
+      # action/checkout fails on Alpine Arm64 without this fix
+      - name: Fix Alpine arm64 compatibility
+        if: matrix.runtimeId == 'linux-musl-arm64'
+        uses: laverdet/alpine-arm64@v1
+
+      - uses: actions/checkout@v6
+
+      # Install packages needed for running .NET on Alpine.
+      - name: Install packages
+        shell: sh
+        run: |
+          if [ -f /etc/alpine-release ]; then
+            apk add --no-cache bash icu
+          fi
+
+      - name: Install .NET SDKs
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: |
+            10.0.x
+
+      - name: Download NuGet package artifact
+        uses: actions/download-artifact@v8
+        with:
+          pattern: nuget-package
+          path: nupkgs
+
+      - name: Download native library artifact for current platform
+        uses: actions/download-artifact@v8
+        with:
+          name: runtimes-${{ matrix.runtimeId }}
+          path: SimdJson.Net/runtimes
+
+      - name: Run NupkgValidator
+        shell: bash
+        run: |
+          cd NupkgValidator
+          dotnet restore --source ../nupkgs
+          dotnet build --no-restore
+          dotnet run --no-build
