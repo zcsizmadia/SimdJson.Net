@@ -55,6 +55,36 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
+    /// <summary>
+    /// Returns the element at the given zero-based <paramref name="index"/>.
+    /// Iterates to that position (O(n)) — prefer <see cref="GetEnumerator"/> for sequential access.
+    /// Throws <see cref="SimdJsonException"/> if the index is out of bounds.
+    /// </summary>
+    public JsonValue ElementAt(int index)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ArrayBegin(Handle, out nint iter));
+        try
+        {
+            for (int i = 0; ; i++)
+            {
+                SimdJsonException.ThrowIfError(
+                    NativeMethods.ArrayIterNext(iter, out nint valHandle, out int done));
+                if (done != 0)
+                    throw new SimdJsonException(-4); // index out of bounds
+                if (i == index)
+                    return new JsonValue(valHandle, _owner);
+                // Discard intermediate elements
+                NativeMethods.DestroyValue(valHandle);
+            }
+        }
+        finally
+        {
+            NativeMethods.DestroyArrayIter(iter);
+        }
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

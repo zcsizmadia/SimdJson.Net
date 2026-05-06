@@ -2,10 +2,13 @@
   <PropertyGroup>
     <ManagePackageVersionsCentrally>true</ManagePackageVersionsCentrally>
   </PropertyGroup>
-
   <ItemGroup Label="Test">
     <PackageVersion Include="TUnit" Version="1.43.11" />
     <PackageVersion Include="TUnit.Assertions" Version="1.43.11" />
     <PackageVersion Include="Microsoft.Testing.Platform.MSBuild" Version="1.6.3" />
+  </ItemGroup>
+  <ItemGroup Label="Benchmark">
+    <PackageVersion Include="BenchmarkDotNet" Version="0.14.0" />
+    <PackageVersion Include="SimdJsonSharp.Managed" Version="1.5.0" />
   </ItemGroup>
 </Project>
