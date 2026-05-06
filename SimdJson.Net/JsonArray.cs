@@ -116,6 +116,69 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
         SimdJsonException.ThrowIfError(NativeMethods.ArrayReset(Handle));
     }
 
+    // ── Type predicates ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns <see langword="true"/> if the array contains no elements.
+    /// This is faster than checking <c>Count == 0</c> because it avoids a full scan.
+    /// </summary>
+    public bool IsEmpty()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ArrayIsEmpty(Handle, out int v));
+        return v != 0;
+    }
+
+    // ── JSON Pointer and JSONPath ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Gets a value via a JSON Pointer path starting from this array (e.g. <c>"/0/name"</c>).
+    /// </summary>
+    public unsafe JsonValue AtPointer(string pointer)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        int maxBytes = System.Text.Encoding.UTF8.GetMaxByteCount(pointer.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = System.Text.Encoding.UTF8.GetBytes(pointer, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(NativeMethods.ArrayAtPointer(Handle, p, out nint h));
+            return new JsonValue(h, _owner);
+        }
+    }
+
+    /// <summary>
+    /// Gets a value via a JSONPath expression starting from this array (e.g. <c>"$[0].name"</c>).
+    /// </summary>
+    public unsafe JsonValue AtPath(string jsonPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        int maxBytes = System.Text.Encoding.UTF8.GetMaxByteCount(jsonPath.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = System.Text.Encoding.UTF8.GetBytes(jsonPath, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(NativeMethods.ArrayAtPath(Handle, p, out nint h));
+            return new JsonValue(h, _owner);
+        }
+    }
+
+    /// <summary>Tries to get a value via a JSON Pointer path.</summary>
+    public bool TryAtPointer(string pointer, out JsonValue? value)
+    {
+        try { value = AtPointer(pointer); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
+    /// <summary>Tries to get a value via a JSONPath expression.</summary>
+    public bool TryAtPath(string jsonPath, out JsonValue? value)
+    {
+        try { value = AtPath(jsonPath); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

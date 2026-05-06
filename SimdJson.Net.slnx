@@ -13,6 +13,12 @@
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
   </Folder>
+  <Folder Name="/SimdJson.Net.Native/">
+    <File Path="SimdJson.Net.Native/CMakePresets.json" />
+    <File Path="SimdJson.Net.Native/CMakeLists.txt" />
+    <File Path="SimdJson.Net.Native/include/simdjson_native.h" />
+    <File Path="SimdJson.Net.Native/src/simdjson_native.cpp" />
+  </Folder>
   <Project Path="SimdJson.Net/SimdJson.Net.csproj" />
   <Project Path="SimdJson.Net.Tests/SimdJson.Net.Tests.csproj" />
   <Project Path="SimdJson.Net.Benchmark/SimdJson.Net.Benchmark.csproj" />

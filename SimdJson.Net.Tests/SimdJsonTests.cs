@@ -1105,3 +1105,468 @@ public class ObjectResetTests
         await Assert.That(count).IsEqualTo(2);
     }
 }
+
+// ─── IsScalar / IsString tests ────────────────────────────────────────────────
+
+public class TypePredicateTests
+{
+    [Test]
+    public async Task ValueIsScalar_OnNumber_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":42}""");
+        using var val = doc.GetField("n");
+        await Assert.That(val.IsScalar()).IsTrue();
+    }
+
+    [Test]
+    public async Task ValueIsScalar_OnArray_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":[1,2]}""");
+        using var val = doc.GetField("a");
+        await Assert.That(val.IsScalar()).IsFalse();
+    }
+
+    [Test]
+    public async Task ValueIsString_OnString_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"hello"}""");
+        using var val = doc.GetField("s");
+        await Assert.That(val.IsString()).IsTrue();
+    }
+
+    [Test]
+    public async Task ValueIsString_OnNumber_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":1}""");
+        using var val = doc.GetField("n");
+        await Assert.That(val.IsString()).IsFalse();
+    }
+
+    [Test]
+    public async Task DocumentIsScalar_OnScalarRoot_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""42""");
+        await Assert.That(doc.IsScalar()).IsTrue();
+    }
+
+    [Test]
+    public async Task DocumentIsScalar_OnObjectRoot_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"x":1}""");
+        await Assert.That(doc.IsScalar()).IsFalse();
+    }
+
+    [Test]
+    public async Task DocumentIsString_OnStringRoot_ReturnsTrue()
+    {
+        // JSON: "hello"  (a root-level JSON string value)
+        using var doc = SimdJsonParser.Shared.Parse("\"hello\"");
+        await Assert.That(doc.IsString()).IsTrue();
+    }
+
+    [Test]
+    public async Task ArrayIsEmpty_OnEmptyArray_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""[]""");
+        using var arr = doc.GetArray();
+        await Assert.That(arr.IsEmpty()).IsTrue();
+    }
+
+    [Test]
+    public async Task ArrayIsEmpty_OnNonEmptyArray_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""[1,2,3]""");
+        using var arr = doc.GetArray();
+        await Assert.That(arr.IsEmpty()).IsFalse();
+    }
+}
+
+// ─── GetNumber (structured number) tests ─────────────────────────────────────
+
+public class GetNumberTests
+{
+    [Test]
+    public async Task GetNumber_Float_ReturnsFloatingPoint()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"x":3.14}""");
+        using var val = doc.GetField("x");
+        var num = val.GetNumber();
+        await Assert.That(num.NumberType).IsEqualTo(JsonNumberType.FloatingPoint);
+        await Assert.That(num.AsDouble()).IsEqualTo(3.14);
+    }
+
+    [Test]
+    public async Task GetNumber_Negative_ReturnsSigned()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"x":-99}""");
+        using var val = doc.GetField("x");
+        var num = val.GetNumber();
+        await Assert.That(num.NumberType).IsEqualTo(JsonNumberType.SignedInteger);
+        await Assert.That(num.AsInt64()).IsEqualTo(-99L);
+    }
+
+    [Test]
+    public async Task GetNumber_LargeUnsigned_ReturnsUnsigned()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"x":18446744073709551615}""");
+        using var val = doc.GetField("x");
+        var num = val.GetNumber();
+        await Assert.That(num.NumberType).IsEqualTo(JsonNumberType.UnsignedInteger);
+        await Assert.That(num.AsUInt64()).IsEqualTo(ulong.MaxValue);
+    }
+
+    [Test]
+    public async Task GetNumber_ToString_ReturnsRepresentation()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"x":7}""");
+        using var val = doc.GetField("x");
+        var num = val.GetNumber();
+        await Assert.That(num.ToString()).IsEqualTo("7");
+    }
+}
+
+// ─── DocumentGetValue tests ───────────────────────────────────────────────────
+// document.get_value() in simdjson works for OBJECT and ARRAY roots only.
+// Scalar roots return SCALAR_DOCUMENT_AS_VALUE; those should throw.
+
+public class DocumentGetValueTests
+{
+    [Test]
+    public async Task DocumentGetValue_ObjectRoot_ReturnsObjectValue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"x":1}""");
+        using var val = doc.GetValue();
+        await Assert.That(val.ValueKind).IsEqualTo(JsonValueKind.Object);
+    }
+
+    [Test]
+    public async Task DocumentGetValue_ArrayRoot_ReturnsArrayValue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""[1,2,3]""");
+        using var val = doc.GetValue();
+        await Assert.That(val.ValueKind).IsEqualTo(JsonValueKind.Array);
+    }
+
+    [Test]
+    public async Task DocumentGetValue_ScalarRoot_Throws()
+    {
+        // simdjson does not support get_value() on scalar-root documents
+        using var doc = SimdJsonParser.Shared.Parse("""42""");
+        await Assert.That(() => doc.GetValue()).Throws<SimdJsonException>();
+    }
+}
+
+// ─── CurrentDepth tests ───────────────────────────────────────────────────────
+
+public class CurrentDepthTests
+{
+    [Test]
+    public async Task DocumentCurrentDepth_AfterParse_IsAtLeastOne()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":1}""");
+        // simdjson initialises the iterator at depth 1 (the document root level)
+        await Assert.That(doc.CurrentDepth()).IsGreaterThan(0);
+    }
+
+    [Test]
+    public async Task ValueCurrentDepth_NestedValue_IsGreaterThanZero()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":{"b":1}}""");
+        using var outer = doc.GetField("a");
+        using var inner = outer.GetField("b");
+        // After accessing a nested value the depth is > 0
+        await Assert.That(inner.CurrentDepth()).IsGreaterThan(0);
+    }
+}
+
+// ─── Parser configuration tests ──────────────────────────────────────────────
+
+public class ParserConfigurationTests
+{
+    [Test]
+    public async Task CreateParser_DefaultMaxCapacity_IsPositive()
+    {
+        using var parser = new SimdJsonParser();
+        await Assert.That(parser.MaxCapacity).IsGreaterThan((nuint)0);
+    }
+
+    [Test]
+    public async Task CreateParser_WithCapacity_SetMaxCapacity()
+    {
+        nuint cap = 1024 * 1024; // 1 MiB
+        using var parser = new SimdJsonParser(cap);
+        await Assert.That(parser.MaxCapacity).IsEqualTo(cap);
+    }
+
+    [Test]
+    public async Task ParserMaxDepth_IsPositive()
+    {
+        using var parser = new SimdJsonParser();
+        await Assert.That(parser.MaxDepth).IsGreaterThan((nuint)0);
+    }
+
+    [Test]
+    public async Task ParserCapacity_AfterParse_IsPositive()
+    {
+        using var parser = new SimdJsonParser();
+        using var doc = parser.Parse("""{"x":1}""");
+        await Assert.That(parser.Capacity).IsGreaterThan((nuint)0);
+    }
+
+    [Test]
+    public async Task ParserMaxCapacity_Setter_ChangesValue()
+    {
+        using var parser = new SimdJsonParser();
+        nuint newCap = 512 * 1024;
+        parser.MaxCapacity = newCap;
+        await Assert.That(parser.MaxCapacity).IsEqualTo(newCap);
+    }
+}
+
+// ─── Array AtPointer / AtPath tests ──────────────────────────────────────────
+
+public class ArrayPointerPathTests
+{
+    [Test]
+    public async Task ArrayAtPointer_ReturnsCorrectValue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""[{"name":"Alice"},{"name":"Bob"}]""");
+        using var arr = doc.GetArray();
+        using var val = arr.AtPointer("/1/name");
+        await Assert.That(val.GetString()).IsEqualTo("Bob");
+    }
+
+    [Test]
+    public async Task ArrayTryAtPointer_InvalidPath_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""[1,2,3]""");
+        using var arr = doc.GetArray();
+        var result = arr.TryAtPointer("/99/x", out var v);
+        await Assert.That(result).IsFalse();
+        await Assert.That(v).IsNull();
+    }
+
+    [Test]
+    public async Task ArrayAtPath_ReturnsCorrectValue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""[{"name":"Alice"},{"name":"Bob"}]""");
+        using var arr = doc.GetArray();
+        using var val = arr.AtPath("$[0].name");
+        await Assert.That(val.GetString()).IsEqualTo("Alice");
+    }
+}
+
+// ─── New gap-filling tests ────────────────────────────────────────────────────
+
+public class ObjectIsEmptyTests
+{
+    [Test]
+    public async Task ObjectIsEmpty_EmptyObject_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("{}");
+        using var obj = doc.GetObject();
+        await Assert.That(obj.IsEmpty()).IsTrue();
+    }
+
+    [Test]
+    public async Task ObjectIsEmpty_NonEmptyObject_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":1}""");
+        using var obj = doc.GetObject();
+        await Assert.That(obj.IsEmpty()).IsFalse();
+    }
+}
+
+public class FindFieldUnorderedTests
+{
+    [Test]
+    public async Task ObjectFindFieldUnordered_LastField_ReturnsValue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":1,"b":2,"c":3}""");
+        using var obj = doc.GetObject();
+        using var val = obj.FindFieldUnordered("c");
+        await Assert.That(val.GetInt64()).IsEqualTo(3L);
+    }
+
+    [Test]
+    public async Task ObjectFindFieldUnordered_MissingKey_Throws()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":1}""");
+        using var obj = doc.GetObject();
+        await Assert.That(() => obj.FindFieldUnordered("z"))
+            .Throws<SimdJsonException>();
+    }
+
+    [Test]
+    public async Task ObjectTryFindFieldUnordered_ExistingKey_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"x":42}""");
+        using var obj = doc.GetObject();
+        var found = obj.TryFindFieldUnordered("x", out var val);
+        using var _ = val;
+        await Assert.That(found).IsTrue();
+        await Assert.That(val!.GetInt64()).IsEqualTo(42L);
+    }
+
+    [Test]
+    public async Task ObjectTryFindFieldUnordered_MissingKey_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"x":42}""");
+        using var obj = doc.GetObject();
+        var found = obj.TryFindFieldUnordered("z", out var val);
+        await Assert.That(found).IsFalse();
+        await Assert.That(val).IsNull();
+    }
+
+    [Test]
+    public async Task DocumentFindFieldUnordered_LastField_ReturnsValue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":1,"b":2,"z":99}""");
+        using var val = doc.FindFieldUnordered("z");
+        await Assert.That(val.GetInt64()).IsEqualTo(99L);
+    }
+
+    [Test]
+    public async Task DocumentTryFindFieldUnordered_MissingKey_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":1}""");
+        var found = doc.TryFindFieldUnordered("missing", out var val);
+        await Assert.That(found).IsFalse();
+        await Assert.That(val).IsNull();
+    }
+
+    [Test]
+    public async Task ValueFindFieldUnordered_NestedLastField_ReturnsValue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"outer":{"x":1,"y":2}}""");
+        using var outer = doc.GetField("outer");
+        using var val = outer.FindFieldUnordered("y");
+        await Assert.That(val.GetInt64()).IsEqualTo(2L);
+    }
+
+    [Test]
+    public async Task ValueTryFindFieldUnordered_MissingKey_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"outer":{"x":1}}""");
+        using var outer = doc.GetField("outer");
+        var found = outer.TryFindFieldUnordered("nope", out var val);
+        await Assert.That(found).IsFalse();
+        await Assert.That(val).IsNull();
+    }
+}
+
+public class DocumentNumberHelpersTests
+{
+    [Test]
+    public async Task DocumentGetNumberType_FloatRoot_ReturnsFloating()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("3.14");
+        await Assert.That(doc.GetNumberType()).IsEqualTo(JsonNumberType.FloatingPoint);
+    }
+
+    [Test]
+    public async Task DocumentGetNumberType_IntRoot_ReturnsSigned()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("42");
+        await Assert.That(doc.GetNumberType()).IsEqualTo(JsonNumberType.SignedInteger);
+    }
+
+    [Test]
+    public async Task DocumentIsNegative_NegativeNumber_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("-7");
+        await Assert.That(doc.IsNegative()).IsTrue();
+    }
+
+    [Test]
+    public async Task DocumentIsNegative_PositiveNumber_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("5");
+        await Assert.That(doc.IsNegative()).IsFalse();
+    }
+
+    [Test]
+    public async Task DocumentIsInteger_WholeNumber_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("100");
+        await Assert.That(doc.IsInteger()).IsTrue();
+    }
+
+    [Test]
+    public async Task DocumentIsInteger_FloatNumber_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("1.5");
+        await Assert.That(doc.IsInteger()).IsFalse();
+    }
+
+    [Test]
+    public async Task DocumentGetNumber_FloatRoot_ReturnsFloatingPointNumber()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("2.5");
+        var n = doc.GetNumber();
+        await Assert.That(n.NumberType).IsEqualTo(JsonNumberType.FloatingPoint);
+        await Assert.That(n.AsDouble()).IsEqualTo(2.5);
+    }
+
+    [Test]
+    public async Task DocumentGetNumber_IntRoot_ReturnsSignedInteger()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("123");
+        var n = doc.GetNumber();
+        await Assert.That(n.NumberType).IsEqualTo(JsonNumberType.SignedInteger);
+        await Assert.That(n.AsInt64()).IsEqualTo(123L);
+    }
+
+    [Test]
+    public async Task DocumentGetRawJsonToken_NumberRoot_ReturnsLiteral()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("42");
+        await Assert.That(doc.GetRawJsonToken()).IsEqualTo("42");
+    }
+
+    [Test]
+    public async Task DocumentGetRawJsonToken_StringRoot_ReturnsQuotedLiteral()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("\"hello\"");
+        // raw token includes the surrounding quotes
+        await Assert.That(doc.GetRawJsonToken()).IsEqualTo("\"hello\"");
+    }
+
+    [Test]
+    public async Task DocumentGetRawJsonTokenSpan_NumberRoot_ReturnsBytes()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("99");
+        var span = doc.GetRawJsonTokenSpan();
+        await Assert.That(Encoding.UTF8.GetString(span)).IsEqualTo("99");
+    }
+}
+
+public class ParseAllowIncompleteJsonTests
+{
+    [Test]
+    public async Task ParseAllowIncompleteJson_CompleteJson_ParsesNormally()
+    {
+        using var doc = SimdJsonParser.Shared.ParseAllowIncompleteJson("""{"key":"value"}""");
+        using var val = doc.GetField("key");
+        await Assert.That(val.GetString()).IsEqualTo("value");
+    }
+
+    [Test]
+    public async Task ParseAllowIncompleteJson_TruncatedArray_DoesNotThrowOnParse()
+    {
+        // Truncated JSON — parse itself should not throw (access may or may not fail)
+        var truncated = "[1,2,3"u8.ToArray();
+        await Assert.That(() =>
+        {
+            using var doc = SimdJsonParser.Shared.ParseAllowIncompleteJson(truncated);
+        }).ThrowsNothing();
+    }
+
+    [Test]
+    public async Task ParseAllowIncompleteJson_StringOverload_CompleteJson_Works()
+    {
+        using var doc = SimdJsonParser.Shared.ParseAllowIncompleteJson("""[1,2,3]""");
+        using var arr = doc.GetArray();
+        await Assert.That(arr.Count).IsEqualTo(3);
+    }
+}

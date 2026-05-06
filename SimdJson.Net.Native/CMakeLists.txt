@@ -35,6 +35,8 @@ FetchContent_Declare(
 # Tell simdjson's own CMake to produce a static archive only.
 set(BUILD_SHARED_LIBS         OFF CACHE BOOL "" FORCE)  # make simdjson build static
 set(SIMDJSON_DEVELOPER_MODE   OFF CACHE BOOL "" FORCE)
+# Enable the experimental incomplete-JSON parsing API used by SimdJsonNative_ParseAllowIncompleteJson.
+add_compile_definitions(SIMDJSON_EXPERIMENTAL_ALLOW_INCOMPLETE_JSON)
 
 FetchContent_MakeAvailable(simdjson)
 
@@ -97,12 +99,12 @@ set_target_properties(SimdJsonNative PROPERTIES
     OUTPUT_NAME "SimdJsonNative"
 )
 
-# ─── 5. Optional install rules ───────────────────────────────────────────────
-include(GNUInstallDirs)
+# ─── 5. Install rules ────────────────────────────────────────────────────────
+# DESTINATION "." means files land directly in CMAKE_INSTALL_PREFIX with no
+# bin/ or lib/ subdirectory.  In CI, --prefix is set to
+#   SimdJson.Net/runtimes/<runtimeId>/native
+# so the DLL/so/dylib ends up exactly where the NuGet layout expects it.
 install(TARGETS SimdJsonNative
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}   # .dll on Windows
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}   # .so / .dylib
-)
-install(FILES include/simdjson_native.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    RUNTIME DESTINATION .   # .dll on Windows
+    LIBRARY DESTINATION .   # .so / .dylib on Linux / macOS
 )

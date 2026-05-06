@@ -366,6 +366,31 @@ public sealed class JsonValue : IDisposable
     }
 
     /// <summary>
+    /// Searches forward from the current iterator position for a field by key without
+    /// requiring fields to be in order (may rewind). Equivalent to <c>value::find_field_unordered()</c>.
+    /// </summary>
+    public unsafe JsonValue FindFieldUnordered(string key)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(key.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(key, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(NativeMethods.ValueFindFieldUnordered(Handle, p, out var h));
+            return new JsonValue(h, _owner);
+        }
+    }
+
+    /// <summary>Tries to find a field unordered; returns <see langword="false"/> if not found.</summary>
+    public bool TryFindFieldUnordered(string key, out JsonValue? value)
+    {
+        try { value = FindFieldUnordered(key); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
+    /// <summary>
     /// Searches forward from the current iterator position for a field with the given key
     /// (order-sensitive, does not rewind). Faster than <see cref="GetField"/> when fields
     /// are accessed in document order.
@@ -396,6 +421,84 @@ public sealed class JsonValue : IDisposable
     {
         try { value = AtPath(jsonPath); return true; }
         catch (SimdJsonException) { value = null; return false; }
+    }
+
+    // ── Type predicates ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns <see langword="true"/> if this value is a scalar (not array or object).
+    /// </summary>
+    public bool IsScalar()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueIsScalar(Handle, out int v));
+        return v != 0;
+    }
+
+    /// <summary>Returns <see langword="true"/> if this value is a JSON string.</summary>
+    public bool IsString()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueIsString(Handle, out int v));
+        return v != 0;
+    }
+
+    // ── Parse location / depth ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the current parse position as a byte offset from the start of the
+    /// document's JSON buffer. Useful for error messages ("error at byte N").
+    /// </summary>
+    /// <param name="owningDocument">
+    /// The <see cref="JsonDocument"/> that owns this value (required to compute the offset).
+    /// </param>
+    public nuint CurrentOffset(JsonDocument owningDocument)
+    {
+        ArgumentNullException.ThrowIfNull(owningDocument);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueCurrentOffset(Handle, owningDocument.Handle, out nuint offset));
+        return offset;
+    }
+
+    /// <summary>Returns the current JSON nesting depth (0 = root level).</summary>
+    public int CurrentDepth()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueCurrentDepth(Handle, out int depth));
+        return depth;
+    }
+
+    // ── Structured number ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the full typed number value in a single call as a <see cref="JsonNumber"/>.
+    /// Avoids the need to call <see cref="GetNumberType"/> and a separate getter.
+    /// For <see cref="JsonNumberType.BigInteger"/> numbers, use <see cref="GetRawJsonToken"/>
+    /// to retrieve the decimal string representation.
+    /// </summary>
+    public JsonNumber GetNumber()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetNumber(Handle, out var n));
+        return new JsonNumber(
+            (JsonNumberType)n.Type,
+            n.FloatingPoint,
+            n.SignedInteger,
+            n.UnsignedInteger);
+    }
+
+    // ── Wobbly / WTF-8 string ─────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the string value allowing lone Unicode surrogates (WTF-8 / CESU-8).
+    /// The returned bytes may not be valid UTF-8. Use this for round-tripping JSON
+    /// produced by runtimes (e.g. Java) that emit lone surrogates.
+    /// </summary>
+    public unsafe ReadOnlySpan<byte> GetWobblyStringSpan()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetWobblyString(Handle, out byte* ptr, out nuint len));
+        return new ReadOnlySpan<byte>(ptr, (int)len);
     }
 
     public void Dispose()

@@ -150,6 +150,39 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
         }
     }
 
+    /// <summary>Returns <see langword="true"/> if the object has no fields.</summary>
+    public bool IsEmpty()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ObjectIsEmpty(Handle, out int v));
+        return v != 0;
+    }
+
+    /// <summary>
+    /// Searches for a field by key without requiring fields to appear in order
+    /// (may rewind the iterator). Useful when field order is unknown.
+    /// </summary>
+    public unsafe JsonValue FindFieldUnordered(string key)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(key.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(key, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(NativeMethods.ObjectFindFieldUnordered(Handle, p, out var h));
+            return new JsonValue(h, _owner);
+        }
+    }
+
+    /// <summary>Tries to find a field unordered; returns <see langword="false"/> if not found.</summary>
+    public bool TryFindFieldUnordered(string key, out JsonValue? value)
+    {
+        try { value = FindFieldUnordered(key); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
     /// <summary>Tries to get a value via a JSON Pointer path.</summary>
     public bool TryAtPointer(string pointer, out JsonValue? value)
     {

@@ -362,6 +362,200 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_Minify(
 SJNATIVE_API int32_t SJNATIVE_CALL SimdJsonNative_ValidateUtf8(
     const char* src, size_t src_len);
 
+// ─── JSON number value struct ─────────────────────────────────────────────────
+// Returned by SimdJsonNative_ValueGetNumber. Explicit padding ensures ABI
+// stability across MSVC / GCC / Clang on both 32-bit and 64-bit platforms.
+typedef struct SimdJsonNumber {
+    int32_t  type;    /* SimdJsonNumberType */
+    int32_t  _pad;    /* explicit alignment padding (do not use) */
+    union {
+        double   floating_point;
+        int64_t  signed_integer;
+        uint64_t unsigned_integer;
+    } value;
+} SimdJsonNumber;
+
+// ─── Type predicates ─────────────────────────────────────────────────────────
+
+/** Returns 1 if the value is a scalar (not array or object), 0 otherwise. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueIsScalar(
+    SimdJsonValue value, int32_t* out_val);
+
+/** Returns 1 if the value is a JSON string, 0 otherwise. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueIsString(
+    SimdJsonValue value, int32_t* out_val);
+
+/** Returns 1 if the array contains no elements, 0 otherwise. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayIsEmpty(
+    SimdJsonArray array, int32_t* out_val);
+
+/** Returns 1 if the document root is a scalar (not array or object), 0 otherwise. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentIsScalar(
+    SimdJsonDocument doc, int32_t* out_val);
+
+/** Returns 1 if the document root is a JSON string, 0 otherwise. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentIsString(
+    SimdJsonDocument doc, int32_t* out_val);
+
+// ─── Document root as value ──────────────────────────────────────────────────
+
+/**
+ * Returns the document root as a generic SimdJsonValue handle.
+ * Fails with SIMDJSON_BRIDGE_ERR_SCALAR_DOCUMENT if the root is an array or object;
+ * use DocumentGetArray / DocumentGetObject in those cases.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetValue(
+    SimdJsonDocument doc, SimdJsonValue* out_value);
+
+// ─── Parse location / depth ──────────────────────────────────────────────────
+
+/**
+ * Returns the current parse position as a byte offset from the start of the
+ * document's JSON buffer. Requires the owning document handle to compute the offset.
+ * Useful for error reporting ("error at byte N").
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueCurrentOffset(
+    SimdJsonValue value, SimdJsonDocument doc, size_t* out_offset);
+
+/** Returns the current JSON nesting depth of a value (0 = at root level). */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueCurrentDepth(
+    SimdJsonValue value, int32_t* out_depth);
+
+/** Returns the current parse offset (in bytes from document start) for the document. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentCurrentOffset(
+    SimdJsonDocument doc, size_t* out_offset);
+
+/** Returns the current JSON nesting depth for the document (0 = at root level). */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentCurrentDepth(
+    SimdJsonDocument doc, int32_t* out_depth);
+
+// ─── Parser configuration ────────────────────────────────────────────────────
+
+/**
+ * Creates a parser with a custom maximum document capacity (bytes).
+ * Pass 0 to use the simdjson default (SIMDJSON_MAXSIZE_BYTES, typically 4 GiB).
+ */
+SJNATIVE_API SimdJsonParser SJNATIVE_CALL SimdJsonNative_CreateParserWithCapacity(
+    size_t max_capacity);
+
+/** Returns the current internal buffer capacity (0 if no document has been parsed yet). */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParserCapacity(
+    SimdJsonParser parser, size_t* out_capacity);
+
+/** Returns the maximum allowed document capacity. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParserMaxCapacity(
+    SimdJsonParser parser, size_t* out_max_capacity);
+
+/** Sets the maximum allowed document capacity. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParserSetMaxCapacity(
+    SimdJsonParser parser, size_t max_capacity);
+
+/** Returns the maximum JSON nesting depth the parser supports (compile-time constant). */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParserMaxDepth(
+    SimdJsonParser parser, size_t* out_max_depth);
+
+// ─── Structured number ───────────────────────────────────────────────────────
+
+/**
+ * Gets the full typed number value in a single call.
+ * For big-integer values (type == SIMDJSON_NUMBER_TYPE_BIG_INTEGER),
+ * use ValueRawJsonToken to retrieve the decimal string representation.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetNumber(
+    SimdJsonValue value, SimdJsonNumber* out_number);
+
+// ─── Wobbly / WTF-8 strings ──────────────────────────────────────────────────
+
+/**
+ * Returns the string value allowing lone Unicode surrogates (WTF-8 / CESU-8).
+ * The returned bytes may not be valid UTF-8. Use for round-tripping JSON that
+ * was produced by runtimes (e.g. Java) that emit lone surrogates.
+ * The pointer is valid for the lifetime of the owning document.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetWobblyString(
+    SimdJsonValue value, const char** out_ptr, size_t* out_len);
+
+/** Gets the document root as a wobbly string. Only valid when the root is a JSON string. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetWobblyString(
+    SimdJsonDocument doc, const char** out_ptr, size_t* out_len);
+
+// ─── Array pointer / path navigation ─────────────────────────────────────────
+
+/** Gets a value via a JSON Pointer path starting from an array (e.g. "/0/name"). */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayAtPointer(
+    SimdJsonArray array, const char* json_pointer, SimdJsonValue* out_value);
+
+/** Gets a value via a JSONPath expression starting from an array (e.g. "$[0].name"). */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayAtPath(
+    SimdJsonArray array, const char* json_path, SimdJsonValue* out_value);
+
+// ─── Object predicates ───────────────────────────────────────────────────────
+
+/** Returns 1 if the object contains no fields, 0 otherwise. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectIsEmpty(
+    SimdJsonObject object, int32_t* out_val);
+
+// ─── find_field_unordered ────────────────────────────────────────────────────
+
+/**
+ * Searches the document root for a field by key without requiring fields to be
+ * in order (may rewind). Equivalent to document::find_field_unordered().
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentFindFieldUnordered(
+    SimdJsonDocument doc, const char* key, SimdJsonValue* out_value);
+
+/**
+ * Searches a value (object context) for a field by key without requiring fields
+ * to be in order. Equivalent to value::find_field_unordered().
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueFindFieldUnordered(
+    SimdJsonValue value, const char* key, SimdJsonValue* out_value);
+
+/**
+ * Searches an object for a field by key without requiring fields to be in order.
+ * Equivalent to object::find_field_unordered().
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectFindFieldUnordered(
+    SimdJsonObject object, const char* key, SimdJsonValue* out_value);
+
+// ─── Document number helpers ─────────────────────────────────────────────────
+
+/** Returns the number type of the document root (only valid when root is a number). */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetNumberType(
+    SimdJsonDocument doc, int32_t* out_type);
+
+/** Returns 1 if the document root number is negative, 0 otherwise. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentIsNegative(
+    SimdJsonDocument doc, int32_t* out_val);
+
+/** Returns 1 if the document root number is an integer (no fractional part), 0 otherwise. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentIsInteger(
+    SimdJsonDocument doc, int32_t* out_val);
+
+/**
+ * Gets the full typed number from the document root in a single call.
+ * For big-integer values use DocumentRawJsonToken to retrieve the decimal string.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetNumber(
+    SimdJsonDocument doc, SimdJsonNumber* out_number);
+
+/**
+ * Returns the raw JSON token for the document root (e.g. the literal number or string token).
+ * The pointer is valid for the lifetime of the document.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentRawJsonToken(
+    SimdJsonDocument doc, const char** out_ptr, size_t* out_len);
+
+// ─── Parser – allow incomplete JSON ──────────────────────────────────────────
+
+/**
+ * Parses JSON that may be truncated (e.g. a partial download).
+ * Equivalent to parser::iterate_allow_incomplete_json().
+ * The returned document handle must be destroyed with SimdJsonNative_DestroyDocument.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseAllowIncompleteJson(
+    SimdJsonParser parser, const char* json, size_t length, SimdJsonDocument* out_doc);
+
 #ifdef __cplusplus
 } // extern "C"
 #endif

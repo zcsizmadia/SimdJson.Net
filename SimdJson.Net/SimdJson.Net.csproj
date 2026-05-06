@@ -37,24 +37,4 @@
              LinkBase="runtimes\" />
   </ItemGroup>
 
-  <!--
-    Local development: if SimdJsonNative/build/SimdJsonNative.dll exists (i.e. the
-    developer just did a CMake build), copy it into runtimes/win-x64/native/ before
-    the Content items are resolved so it overrides the checked-in DLL automatically.
-    SkipUnchangedFiles means this is a no-op when nothing changed.
-  -->
-  <Target Name="CopyLocalNativeBuild" BeforeTargets="BeforeBuild">
-    <PropertyGroup>
-      <_LocalNativeDll>$(MSBuildProjectDirectory)\..\SimdJsonNative\build\SimdJsonNative.dll</_LocalNativeDll>
-      <_RuntimesNativeDll>$(MSBuildProjectDirectory)\runtimes\win-x64\native\SimdJsonNative.dll</_RuntimesNativeDll>
-    </PropertyGroup>
-    <Copy Condition="Exists('$(_LocalNativeDll)')"
-          SourceFiles="$(_LocalNativeDll)"
-          DestinationFiles="$(_RuntimesNativeDll)"
-          SkipUnchangedFiles="true" />
-    <Message Condition="Exists('$(_LocalNativeDll)')"
-             Text="[SimdJson.Net] Synced locally built SimdJsonNative.dll from SimdJsonNative/build/"
-             Importance="high" />
-  </Target>
-
 </Project>
