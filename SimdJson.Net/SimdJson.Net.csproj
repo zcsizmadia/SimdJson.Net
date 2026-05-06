@@ -30,11 +30,14 @@
     <None Include="runtimes/**" Pack="true" PackagePath="runtimes/" />
   </ItemGroup>
 
-  <!-- Copy native binaries to the output directory so NativeLoader can find them. -->
+  <!-- Copy native binaries to the output directory so NativeLoader can find them.
+       Pack="false" prevents MSBuild from also adding these to content/ and contentFiles/
+       in the NuGet package — the None item above already packs them under runtimes/. -->
   <ItemGroup>
     <Content Include="runtimes/**"
              CopyToOutputDirectory="PreserveNewest"
-             LinkBase="runtimes\" />
+             LinkBase="runtimes\"
+             Pack="false" />
   </ItemGroup>
 
 </Project>
