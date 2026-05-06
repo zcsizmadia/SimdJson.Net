@@ -20,23 +20,4 @@
     <ProjectReference Include="../SimdJson.Net/SimdJson.Net.csproj" />
   </ItemGroup>
 
-  <!-- Copy the native library next to the test output so NativeLoader can find it.
-       Priority order: CMake build output → runtimes folder placed manually for debugging. -->
-  <ItemGroup>
-    <!-- CMake build output (all platforms) -->
-    <None Include="$(MSBuildThisFileDirectory)../SimdJsonNative/build/SimdJsonNative.dll"
-          Condition="Exists('$(MSBuildThisFileDirectory)../SimdJsonNative/build/SimdJsonNative.dll')"
-          CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)../SimdJsonNative/build/SimdJsonNative.so"
-          Condition="Exists('$(MSBuildThisFileDirectory)../SimdJsonNative/build/SimdJsonNative.so')"
-          CopyToOutputDirectory="PreserveNewest" />
-    <None Include="$(MSBuildThisFileDirectory)../SimdJsonNative/build/SimdJsonNative.dylib"
-          Condition="Exists('$(MSBuildThisFileDirectory)../SimdJsonNative/build/SimdJsonNative.dylib')"
-          CopyToOutputDirectory="PreserveNewest" />
-    <!-- Manually copied binaries in the runtimes layout (used for local debugging) -->
-    <None Include="$(MSBuildThisFileDirectory)../SimdJson.Net/runtimes/**/*.*"
-          CopyToOutputDirectory="PreserveNewest"
-          LinkBase="runtimes" />
-  </ItemGroup>
-
 </Project>

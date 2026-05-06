@@ -15,4 +15,5 @@
   </Folder>
   <Project Path="SimdJson.Net/SimdJson.Net.csproj" />
   <Project Path="SimdJson.Net.Tests/SimdJson.Net.Tests.csproj" />
+  <Project Path="SimdJson.Net.Benchmark/SimdJson.Net.Benchmark.csproj" />
 </Solution>

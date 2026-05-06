@@ -30,4 +30,11 @@
     <None Include="runtimes/**" Pack="true" PackagePath="runtimes/" />
   </ItemGroup>
 
+  <!-- Copy native binaries to the output directory so NativeLoader can find them. -->
+  <ItemGroup>
+    <Content Include="runtimes/**"
+             CopyToOutputDirectory="PreserveNewest"
+             LinkBase="runtimes\" />
+  </ItemGroup>
+
 </Project>

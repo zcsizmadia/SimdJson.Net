@@ -52,6 +52,23 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     /// <inheritdoc cref="GetField(string)"/>
     public JsonValue this[string key] => GetField(key);
 
+    /// <summary>
+    /// Tries to get a field by key.
+    /// Returns <see langword="false"/> (and <see langword="null"/>) if the key does not exist.
+    /// </summary>
+    public bool TryGetField(string key, out JsonValue? value)
+    {
+        try { value = GetField(key); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
+    /// <summary>Returns <see langword="true"/> if a field with the given key exists.</summary>
+    public bool ContainsKey(string key)
+    {
+        try { using var v = GetField(key); return true; }
+        catch (SimdJsonException) { return false; }
+    }
+
     /// <summary>Iterates over all key-value pairs.</summary>
     public IEnumerator<JsonProperty> GetEnumerator()
     {

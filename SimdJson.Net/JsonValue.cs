@@ -106,6 +106,82 @@ public sealed class JsonValue : IDisposable
         return new JsonObject(h, _owner);
     }
 
+    // ── Convenience typed getters ────────────────────────────────────────────
+
+    /// <summary>Gets the value as an <see cref="int"/>. Throws if not an integer.</summary>
+    public int GetInt32() => (int)GetInt64();
+
+    /// <summary>Gets the value as a <see cref="float"/>. Throws if not a number.</summary>
+    public float GetFloat() => (float)GetDouble();
+
+    /// <summary>Gets the value as a <see cref="decimal"/>. Throws if not a number.</summary>
+    public decimal GetDecimal() => (decimal)GetDouble();
+
+    // ── Try-get value methods ────────────────────────────────────────────────
+
+    /// <summary>Tries to get the value as a <see cref="string"/>. Returns <see langword="false"/> if the value is not a JSON string.</summary>
+    public bool TryGetString(out string value)
+    {
+        try { value = GetString(); return true; }
+        catch (SimdJsonException) { value = null!; return false; }
+    }
+
+    /// <summary>Tries to get the value as a <see cref="long"/>. Returns <see langword="false"/> if the value is not an integer.</summary>
+    public bool TryGetInt64(out long value)
+    {
+        try { value = GetInt64(); return true; }
+        catch (SimdJsonException) { value = default; return false; }
+    }
+
+    /// <summary>Tries to get the value as an <see cref="int"/>. Returns <see langword="false"/> if the value is not an integer.</summary>
+    public bool TryGetInt32(out int value)
+    {
+        try { value = GetInt32(); return true; }
+        catch (SimdJsonException) { value = default; return false; }
+    }
+
+    /// <summary>Tries to get the value as a <see cref="double"/>. Returns <see langword="false"/> if the value is not a number.</summary>
+    public bool TryGetDouble(out double value)
+    {
+        try { value = GetDouble(); return true; }
+        catch (SimdJsonException) { value = default; return false; }
+    }
+
+    /// <summary>Tries to get the value as a <see cref="float"/>. Returns <see langword="false"/> if the value is not a number.</summary>
+    public bool TryGetFloat(out float value)
+    {
+        try { value = GetFloat(); return true; }
+        catch (SimdJsonException) { value = default; return false; }
+    }
+
+    /// <summary>Tries to get the value as a <see cref="bool"/>. Returns <see langword="false"/> if the value is not a boolean.</summary>
+    public bool TryGetBool(out bool value)
+    {
+        try { value = GetBool(); return true; }
+        catch (SimdJsonException) { value = default; return false; }
+    }
+
+    /// <summary>Tries to get the value as a <see cref="ulong"/>. Returns <see langword="false"/> if the value is not an unsigned integer.</summary>
+    public bool TryGetUInt64(out ulong value)
+    {
+        try { value = GetUInt64(); return true; }
+        catch (SimdJsonException) { value = default; return false; }
+    }
+
+    /// <summary>Tries to get the value as a <see cref="JsonArray"/>. Returns <see langword="false"/> if the value is not an array.</summary>
+    public bool TryGetArray(out JsonArray? value)
+    {
+        try { value = GetArray(); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
+    /// <summary>Tries to get the value as a <see cref="JsonObject"/>. Returns <see langword="false"/> if the value is not an object.</summary>
+    public bool TryGetObject(out JsonObject? value)
+    {
+        try { value = GetObject(); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
     /// <summary>Gets a child field by key. Throws if this value is not an object.</summary>
     public unsafe JsonValue GetField(string key)
     {

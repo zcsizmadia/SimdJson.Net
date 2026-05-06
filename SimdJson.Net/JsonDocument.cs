@@ -75,6 +75,26 @@ public sealed class JsonDocument : IDisposable
     /// <inheritdoc cref="GetField(string)"/>
     public JsonValue this[string key] => GetField(key);
 
+    /// <summary>
+    /// Tries to get a field from the root object by key.
+    /// Returns <see langword="false"/> (and <see langword="null"/>) if the field does not exist.
+    /// </summary>
+    public bool TryGetField(string key, out JsonValue? value)
+    {
+        try { value = GetField(key); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
+    /// <summary>
+    /// Tries to get a value at a JSON Pointer path.
+    /// Returns <see langword="false"/> (and <see langword="null"/>) if the path does not resolve.
+    /// </summary>
+    public bool TryAtPointer(string pointer, out JsonValue? value)
+    {
+        try { value = AtPointer(pointer); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
