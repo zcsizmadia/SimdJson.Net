@@ -1,7 +1,6 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Columns;
 using System.Text.Json;
-using StjJsonDocument = System.Text.Json.JsonDocument;
 
 namespace SimdJson.Benchmark.Benchmarks;
 
@@ -32,7 +31,10 @@ public unsafe class FullTraversalBenchmarks
         int count = 0;
         var reader = new Utf8JsonReader(_data);
         while (reader.Read())
+        {
             count++;
+        }
+
         return count;
     }
 
@@ -74,7 +76,11 @@ public unsafe class FullTraversalBenchmarks
     [Benchmark(Description = "SimdJsonSharp")]
     public int SimdJsonSharpManaged()
     {
-        if (!SimdJsonSharpAvailable) return 0;
+        if (!SimdJsonSharpAvailable)
+        {
+            return 0;
+        }
+
         int count = 0;
         fixed (byte* ptr = _data)
         {
@@ -82,7 +88,9 @@ public unsafe class FullTraversalBenchmarks
             if (iter.IsOk)
             {
                 while (iter.MoveForward())
+                {
                     count++;
+                }
             }
         }
         return count;

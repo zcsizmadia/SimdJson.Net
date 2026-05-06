@@ -23,8 +23,8 @@ static void Try(string label, Action action)
 // ── 1. Invalid JSON ────────────────────────────────────────────────────────
 // On-Demand is lazy: the error only surfaces when data is actually accessed.
 Console.WriteLine("── Parse errors ──");
-Try("invalid json",   () => { using var d = SimdJsonParser.Shared.Parse("{bad"); using var o = d.GetObject(); foreach (var p in o) p.Value.Dispose(); });
-Try("trailing comma", () => { using var d = SimdJsonParser.Shared.Parse("""{{"a":1,}}"""); using var o = d.GetObject(); foreach (var p in o) p.Value.Dispose(); });
+Try("invalid json",   () => { using var d = SimdJsonParser.Shared.Parse("{bad"); using var o = d.GetObject(); foreach (var p in o) { p.Value.Dispose(); } });
+Try("trailing comma", () => { using var d = SimdJsonParser.Shared.Parse("""{{"a":1,}}"""); using var o = d.GetObject(); foreach (var p in o) { p.Value.Dispose(); } });
 
 // ── 2. Wrong type ──────────────────────────────────────────────────────────
 Console.WriteLine();

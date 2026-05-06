@@ -3,7 +3,6 @@ using BenchmarkDotNet.Columns;
 using BenchmarkDotNet.Reports;
 using BenchmarkDotNet.Running;
 using SimdJson.Benchmark;
-using SimdJson.Benchmark.Benchmarks;
 
 // ── quick smoke-test when not in Release mode ────────────────────────────────
 if (!IsReleaseBuild())
@@ -44,11 +43,15 @@ static void RunSmokeTest()
 
         // STJ
         using (var doc = System.Text.Json.JsonDocument.Parse(data))
+        {
             Console.Write($"STJ:{doc.RootElement.ValueKind}  ");
+        }
 
         // SimdJson.Net
         using (var doc = SimdJson.SimdJsonParser.Shared.Parse(data))
+        {
             Console.Write($"SimdJson.Net:{doc.ValueKind}  ");
+        }
 
         // SimdJsonSharp — requires AVX2; skip gracefully if unavailable
         try

@@ -1,6 +1,5 @@
 using BenchmarkDotNet.Attributes;
 using BenchmarkDotNet.Columns;
-using SimdJson;
 using StjValueKind = System.Text.Json.JsonValueKind;
 using StjJsonDocument = System.Text.Json.JsonDocument;
 

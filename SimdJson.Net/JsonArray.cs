@@ -43,7 +43,11 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
             while (true)
             {
                 SimdJsonException.ThrowIfError(NativeMethods.ArrayIterNext(iter, out nint valHandle, out int done));
-                if (done != 0) yield break;
+                if (done != 0)
+                {
+                    yield break;
+                }
+
                 yield return new JsonValue(valHandle, _owner);
             }
         }
@@ -72,9 +76,14 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
                 SimdJsonException.ThrowIfError(
                     NativeMethods.ArrayIterNext(iter, out nint valHandle, out int done));
                 if (done != 0)
+                {
                     throw new SimdJsonException(-4); // index out of bounds
+                }
+
                 if (i == index)
+                {
                     return new JsonValue(valHandle, _owner);
+                }
                 // Discard intermediate elements
                 NativeMethods.DestroyValue(valHandle);
             }
@@ -181,7 +190,11 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+        {
+            return;
+        }
+
         _disposed = true;
         NativeMethods.DestroyArray(Handle);
         Handle = 0;

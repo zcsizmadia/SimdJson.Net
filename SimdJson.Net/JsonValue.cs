@@ -1,4 +1,6 @@
 using System.Text;
+using System.Runtime.InteropServices;
+using System.Runtime.CompilerServices;
 using SimdJson.Internal;
 
 namespace SimdJson;
@@ -11,13 +13,15 @@ namespace SimdJson;
 public sealed class JsonValue : IDisposable
 {
     internal nint Handle;
-    private readonly JsonDocument _owner;
+    private readonly JsonDocument? _owner;
     private bool _disposed;
+    private readonly bool _isBorrowed;
 
-    internal JsonValue(nint handle, JsonDocument owner)
+    internal JsonValue(nint handle, JsonDocument? owner, bool isBorrowed = false)
     {
         Handle = handle;
         _owner = owner;
+        _isBorrowed = isBorrowed;
     }
 
     /// <summary>Gets the JSON type of this value.</summary>
@@ -95,7 +99,7 @@ public sealed class JsonValue : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetArray(Handle, out var h));
-        return new JsonArray(h, _owner);
+        return new JsonArray(h, _owner!);
     }
 
     /// <summary>Gets the value as a <see cref="JsonObject"/>. Throws if not an object.</summary>
@@ -103,7 +107,7 @@ public sealed class JsonValue : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetObject(Handle, out var h));
-        return new JsonObject(h, _owner);
+        return new JsonObject(h, _owner!);
     }
 
     // ── Convenience typed getters ────────────────────────────────────────────
@@ -503,9 +507,86 @@ public sealed class JsonValue : IDisposable
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed || _isBorrowed)
+        {
+            return;
+        }
+
         _disposed = true;
         NativeMethods.DestroyValue(Handle);
         Handle = 0;
+    }
+
+    // ── Raw JSON string (without unescaping) ──────────────────────────────────
+
+    /// <summary>
+    /// Returns the raw (still-escaped) UTF-8 bytes of a JSON string value, without the
+    /// surrounding quote characters.
+    /// For example, for <c>"hello\nworld"</c> this returns the bytes
+    /// <c>h e l l o \ n w o r l d</c> (backslash + n, not a newline).
+    /// The span is valid for the lifetime of the owning document.
+    /// Throws if this value is not a JSON string.
+    /// </summary>
+    public unsafe ReadOnlySpan<byte> GetRawJsonStringSpan()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetRawJsonString(Handle, out byte* ptr, out nuint len));
+        return new ReadOnlySpan<byte>(ptr, (int)len);
+    }
+
+    /// <summary>
+    /// Returns the raw (still-escaped) bytes of a JSON string value as a <see cref="string"/>,
+    /// without the surrounding quote characters.
+    /// Throws if this value is not a JSON string.
+    /// </summary>
+    public unsafe string GetRawJsonString()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetRawJsonString(Handle, out byte* ptr, out nuint len));
+        return Encoding.UTF8.GetString(ptr, (int)len);
+    }
+
+    // ── Wildcard path iteration ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Iterates over all values in this value (which must be an array or object) that match
+    /// the given JSONPath expression with wildcard support (e.g. <c>"$[*]"</c>,
+    /// <c>"$.items[*].name"</c>) and invokes <paramref name="callback"/> for each match.
+    /// </summary>
+    /// <remarks>
+    /// The <see cref="JsonValue"/> passed to <paramref name="callback"/> is borrowed —
+    /// it is valid only for the duration of the callback invocation and must not be disposed
+    /// or stored for use after the callback returns.
+    /// </remarks>
+    public unsafe void ForEachAtPath(string path, Action<JsonValue> callback)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(callback);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(path.Length);
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(path, buf);
+        var gcHandle = GCHandle.Alloc(callback);
+        try
+        {
+            fixed (byte* p = buf)
+            {
+                SimdJsonException.ThrowIfError(NativeMethods.ValueForEachAtPath(
+                    Handle, p, (nuint)len, s_wildcardTrampolinePtr, GCHandle.ToIntPtr(gcHandle)));
+            }
+        }
+        finally { gcHandle.Free(); }
+    }
+
+    // ── Internal wildcard trampoline ──────────────────────────────────────────
+
+    internal static readonly unsafe nint s_wildcardTrampolinePtr =
+        (nint)(delegate* unmanaged[Cdecl]<nint, nint, void>)&WildcardTrampoline;
+
+    [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
+    private static void WildcardTrampoline(nint valueHandle, nint context)
+    {
+        var action = (Action<JsonValue>)GCHandle.FromIntPtr(context).Target!;
+        var tmp = new JsonValue(valueHandle, null, isBorrowed: true);
+        action(tmp);
     }
 }

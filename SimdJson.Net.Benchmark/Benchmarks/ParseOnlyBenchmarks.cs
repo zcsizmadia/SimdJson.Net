@@ -46,7 +46,11 @@ public unsafe class ParseOnlyBenchmarks
     [Benchmark(Description = "SimdJsonSharp")]
     public void SimdJsonSharpManaged()
     {
-        if (!SimdJsonSharpAvailable) return;
+        if (!SimdJsonSharpAvailable)
+        {
+            return;
+        }
+
         fixed (byte* ptr = _data)
         {
             using var parsed = SimdJsonSharp.SimdJson.ParseJson(ptr, _data.Length, false);

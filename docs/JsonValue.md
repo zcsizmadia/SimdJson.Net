@@ -71,11 +71,19 @@ For JSON APIs that encode numbers as quoted strings (e.g. `"price": "9.99"`).
 
 ## Raw JSON & diagnostics
 
+## Wildcard path iteration
+
+| Member | Description |
+|--------|-------------|
+| `ForEachAtPath(string path, Action<JsonValue> callback)` | Invoke `callback` for each value matching a JSONPath wildcard expression (e.g. `"$[*]"`, `"$.items[*].name"`, `"$.*"`) starting from this value (must be an array or object). The `JsonValue` passed to the callback is **borrowed** — valid only during the callback, must not be disposed or stored. |
+
 | Member | Description |
 |--------|-------------|
 | `GetRawJsonToken()` | Raw token text as a `string` (includes quotes for strings) |
 | `GetRawJsonTokenSpan()` | Raw token as `ReadOnlySpan<byte>` — zero allocation |
 | `GetRawJson()` | Full raw JSON including nested objects/arrays |
+| `GetRawJsonString()` | Raw escaped bytes of a string value as a `string`, no surrounding quotes |
+| `GetRawJsonStringSpan()` | Same as above as `ReadOnlySpan<byte>` — zero allocation |
 | `GetWobblyStringSpan()` | String as WTF-8 bytes (allows lone surrogates) |
 | `CurrentOffset(JsonDocument)` | Byte offset of current parse position in the document |
 | `CurrentDepth(JsonDocument)` | Current JSON nesting depth (`0` = root level) |

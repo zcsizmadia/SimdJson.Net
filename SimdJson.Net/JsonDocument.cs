@@ -1,4 +1,5 @@
 using System.Text;
+using System.Runtime.InteropServices;
 using SimdJson.Internal;
 
 namespace SimdJson;
@@ -301,9 +302,44 @@ public sealed class JsonDocument : IDisposable
         return depth;
     }
 
+    // ── Wildcard path iteration ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Iterates over all values in the document root that match the given JSONPath expression
+    /// with wildcard support (e.g. <c>"$[*]"</c>, <c>"$.items[*].name"</c>) and invokes
+    /// <paramref name="callback"/> for each match. The document is rewound before iteration.
+    /// </summary>
+    /// <remarks>
+    /// The <see cref="JsonValue"/> passed to <paramref name="callback"/> is borrowed —
+    /// it is valid only for the duration of the callback invocation and must not be disposed
+    /// or stored for use after the callback returns.
+    /// </remarks>
+    public unsafe void ForEachAtPath(string path, Action<JsonValue> callback)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(callback);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(path.Length);
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(path, buf);
+        var gcHandle = GCHandle.Alloc(callback);
+        try
+        {
+            fixed (byte* p = buf)
+            {
+                SimdJsonException.ThrowIfError(NativeMethods.DocumentForEachAtPath(
+                    Handle, p, (nuint)len, JsonValue.s_wildcardTrampolinePtr, GCHandle.ToIntPtr(gcHandle)));
+            }
+        }
+        finally { gcHandle.Free(); }
+    }
+
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+        {
+            return;
+        }
+
         _disposed = true;
         NativeMethods.DestroyDocument(Handle);
         Handle = 0;

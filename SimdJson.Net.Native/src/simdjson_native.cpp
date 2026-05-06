@@ -1361,3 +1361,67 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseAllowIncompleteJson(
         return SIMDJSON_BRIDGE_ERR_UNKNOWN;
     }
 }
+
+// ─── Raw JSON string (without unescaping) ────────────────────────────────────
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetRawJsonString(
+    SimdJsonValue value, const char** out_ptr, size_t* out_len)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_ptr);
+    CHECK_NULL(out_len);
+    auto* bv = static_cast<BridgeValue*>(value);
+    // raw_json_token() is a non-consuming peek that returns the full token including quotes.
+    std::string_view token = bv->value.raw_json_token();
+    if (token.size() < 2 || token.front() != '"') {
+        return SIMDJSON_BRIDGE_ERR_INCORRECT_TYPE;
+    }
+    // Return the inner bytes: after the opening quote, minus the closing quote.
+    *out_ptr = token.data() + 1;
+    *out_len = token.size() - 2;
+    return SIMDJSON_BRIDGE_SUCCESS;
+}
+
+// ─── Wildcard path iteration ──────────────────────────────────────────────────
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentForEachAtPath(
+    SimdJsonDocument doc, const char* path, size_t path_len,
+    SimdJsonWildcardCallback callback, void* context)
+{
+    CHECK_NULL(doc);
+    CHECK_NULL(path);
+    CHECK_NULL(callback);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    try {
+        auto err = bd->doc.for_each_at_path_with_wildcard(
+            std::string_view(path, path_len),
+            [callback, context](simdjson::ondemand::value val) {
+                BridgeValue bv;
+                bv.value = std::move(val);
+                callback(&bv, context);
+            }
+        );
+        return translate_error(err);
+    } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueForEachAtPath(
+    SimdJsonValue value, const char* path, size_t path_len,
+    SimdJsonWildcardCallback callback, void* context)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(path);
+    CHECK_NULL(callback);
+    auto* bv = static_cast<BridgeValue*>(value);
+    try {
+        auto err = bv->value.for_each_at_path_with_wildcard(
+            std::string_view(path, path_len),
+            [callback, context](simdjson::ondemand::value val) {
+                BridgeValue inner;
+                inner.value = std::move(val);
+                callback(&inner, context);
+            }
+        );
+        return translate_error(err);
+    } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
+}

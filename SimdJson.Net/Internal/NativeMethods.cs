@@ -430,4 +430,20 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ParseAllowIncompleteJson")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int ParseAllowIncompleteJson(nint parser, byte* json, nuint length, out nint outDoc);
+
+    // ── Raw JSON string (without unescaping) ──────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetRawJsonString")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetRawJsonString(nint value, out byte* outPtr, out nuint outLen);
+
+    // ── Wildcard path iteration ───────────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentForEachAtPath")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentForEachAtPath(nint doc, byte* path, nuint pathLen, nint callback, nint context);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueForEachAtPath")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueForEachAtPath(nint value, byte* path, nuint pathLen, nint callback, nint context);
 }

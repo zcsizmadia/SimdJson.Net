@@ -37,7 +37,11 @@ public static class JsonDataGenerator
         sb.Append('[');
         for (int i = 1; i <= count; i++)
         {
-            if (i > 1) sb.Append(',');
+            if (i > 1)
+            {
+                sb.Append(',');
+            }
+
             AppendRecord(sb, i);
         }
         sb.Append(']');

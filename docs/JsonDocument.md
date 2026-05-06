@@ -51,6 +51,21 @@ Call `Rewind()` when you need to access the document more than once (e.g. read o
 | `CurrentOffset()` | Byte offset of the current parse position from the document start |
 | `CurrentDepth()` | Current JSON nesting depth (`0` = root level) |
 
+## Wildcard path iteration
+
+| Member | Description |
+|--------|-------------|
+| `ForEachAtPath(string path, Action<JsonValue> callback)` | Invoke `callback` for each value matching a JSONPath wildcard expression. The document is rewound automatically before iteration. The `JsonValue` passed to the callback is **borrowed** — valid only during the callback, must not be disposed or stored. |
+
+Supported path patterns:
+
+| Pattern | Matches |
+|---------|---------|
+| `$[*]` | Every element of the root array |
+| `$.*` | Every field value of the root object |
+| `$.items[*]` | Every element of the `items` array |
+| `$.items[*].name` | The `name` field of every element in `items` |
+
 ## Examples
 
 ```csharp

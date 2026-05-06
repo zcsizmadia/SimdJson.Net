@@ -83,3 +83,32 @@ SimdJsonParser.GetVersion();           // "4.6.3"
 SimdJsonParser.Minify(json);
 SimdJsonParser.ValidateUtf8(bytes);
 ```
+
+### Raw JSON string
+
+```csharp
+using var val = doc.GetField("key");
+val.GetRawJsonString();      // escaped bytes as string, no surrounding quotes
+val.GetRawJsonStringSpan();  // same, zero-allocation ReadOnlySpan<byte>
+// "hello\nworld" in JSON → GetRawJsonString() returns @"hello\nworld" (backslash-n)
+// GetString() returns "hello\nworld" (real newline)
+```
+
+### Wildcard path iteration
+
+```csharp
+// Visit every element of an array
+doc.ForEachAtPath("$[*]", v => Console.WriteLine(v.GetInt64()));
+
+// Extract one field from each object in an array
+doc.ForEachAtPath("$.items[*].name", v => Console.WriteLine(v.GetString()));
+
+// Visit all field values of an object
+doc.ForEachAtPath("$.*", v => Console.WriteLine(v.GetDouble()));
+
+// Start from a value instead of the document root
+using var arrVal = doc.GetField("data");
+arrVal.ForEachAtPath("$[*]", v => results.Add(v.GetString()));
+```
+
+> The `JsonValue` passed to the callback is **borrowed**: valid only during the callback invocation. Do not dispose or store it.

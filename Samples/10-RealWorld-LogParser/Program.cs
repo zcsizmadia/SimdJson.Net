@@ -4,7 +4,6 @@
 // Demonstrates: parser reuse, forward-iteration discipline, GetRawJsonToken,
 // TryGetField, and high-throughput line-by-line processing.
 
-using System.Text;
 using SimdJson;
 
 Console.WriteLine("=== 10 – Real World: Structured Log Parser ===\n");
@@ -77,17 +76,23 @@ Console.WriteLine($"Processed {totalLines} log lines\n");
 
 Console.WriteLine("── Log level counts ──");
 foreach (var (level, count) in counts.OrderBy(kv => kv.Key))
+{
     Console.WriteLine($"  {level,-6} : {count}");
+}
 
 Console.WriteLine();
 Console.WriteLine($"── Errors ({errors.Count}) ──");
 foreach (var (ts, svc, m, err) in errors)
+{
     Console.WriteLine($"  [{ts}] {svc}: {m} — {err}");
+}
 
 Console.WriteLine();
 Console.WriteLine("── Request latencies ──");
 foreach (var (method, path, ms) in latencies)
+{
     Console.WriteLine($"  {method,-6} {path,-12} {ms,4} ms");
+}
 
 if (latencies.Count > 0)
 {

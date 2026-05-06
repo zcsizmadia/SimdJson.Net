@@ -79,7 +79,11 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
             while (true)
             {
                 NextField(iter, out string? key, out nint valHandle, out bool done);
-                if (done) yield break;
+                if (done)
+                {
+                    yield break;
+                }
+
                 yield return new JsonProperty(key!, new JsonValue(valHandle, _owner));
             }
         }
@@ -217,7 +221,11 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
 
     public void Dispose()
     {
-        if (_disposed) return;
+        if (_disposed)
+        {
+            return;
+        }
+
         _disposed = true;
         NativeMethods.DestroyObject(Handle);
         Handle = 0;

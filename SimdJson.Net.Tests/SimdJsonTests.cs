@@ -1,7 +1,5 @@
-using SimdJson;
 using System.Collections;
 using System.Text;
-using TUnit.Assertions.Extensions;
 
 namespace SimdJson.Tests;
 
@@ -166,7 +164,10 @@ public class ArrayTests
         using var arr = doc.GetArray();
         var values = new List<long>();
         foreach (var item in arr)
+        {
             values.Add(item.GetInt64());
+        }
+
         await Assert.That(values).IsEquivalentTo(new[] { 10L, 20L, 30L });
     }
 
@@ -207,7 +208,11 @@ public class ArrayTests
         using var doc = SimdJsonParser.Shared.Parse("[]");
         using var arr = doc.GetArray();
         var count = 0;
-        foreach (var _ in arr) count++;
+        foreach (var _ in arr)
+        {
+            count++;
+        }
+
         await Assert.That(count).IsEqualTo(0);
     }
 
@@ -218,7 +223,9 @@ public class ArrayTests
         using var arr = doc.GetArray();
         var kinds = new List<JsonValueKind>();
         foreach (var item in arr)
+        {
             kinds.Add(item.ValueKind);
+        }
 
         await Assert.That(kinds[0]).IsEqualTo(JsonValueKind.Number);
         await Assert.That(kinds[1]).IsEqualTo(JsonValueKind.String);
@@ -237,7 +244,9 @@ public class ArrayTests
         {
             using var inner = row.GetArray();
             foreach (var cell in inner)
+            {
                 all.Add(cell.GetInt64());
+            }
         }
         await Assert.That(all).IsEquivalentTo(new[] { 1L, 2L, 3L, 4L });
     }
@@ -251,7 +260,10 @@ public class ArrayTests
         IEnumerable nonGeneric = arr;
         var values = new List<long>();
         foreach (JsonValue item in nonGeneric)
+        {
             values.Add(item.GetInt64());
+        }
+
         await Assert.That(values).IsEquivalentTo(new[] { 7L, 8L, 9L });
     }
 }
@@ -306,7 +318,11 @@ public class ObjectTests
         using var doc = SimdJsonParser.Shared.Parse("{}");
         using var obj = doc.GetObject();
         var count = 0;
-        foreach (var _ in obj) count++;
+        foreach (var _ in obj)
+        {
+            count++;
+        }
+
         await Assert.That(count).IsEqualTo(0);
     }
 
@@ -399,12 +415,18 @@ public class DeepNestingTests
         using var evensVal = doc.GetField("evens");
         using var evens = evensVal.GetArray();
         var even = new List<long>();
-        foreach (var n in evens) even.Add(n.GetInt64());
+        foreach (var n in evens)
+        {
+            even.Add(n.GetInt64());
+        }
 
         using var oddsVal = doc.GetField("odds");
         using var odds = oddsVal.GetArray();
         var odd = new List<long>();
-        foreach (var n in odds) odd.Add(n.GetInt64());
+        foreach (var n in odds)
+        {
+            odd.Add(n.GetInt64());
+        }
 
         await Assert.That(even).IsEquivalentTo(new[] { 2L, 4L, 6L });
         await Assert.That(odd).IsEquivalentTo(new[] { 1L, 3L, 5L });
@@ -1568,5 +1590,101 @@ public class ParseAllowIncompleteJsonTests
         using var doc = SimdJsonParser.Shared.ParseAllowIncompleteJson("""[1,2,3]""");
         using var arr = doc.GetArray();
         await Assert.That(arr.Count).IsEqualTo(3);
+    }
+}
+
+public class RawJsonStringTests
+{
+    [Test]
+    public async Task GetRawJsonString_SimpleString_ReturnsEscapedBytes()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"hello"}""");
+        using var val = doc.GetField("s");
+        await Assert.That(val.GetRawJsonString()).IsEqualTo("hello");
+    }
+
+    [Test]
+    public async Task GetRawJsonString_EscapedNewline_ReturnsTwoByteEscape()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"a\nb"}""");
+        using var val = doc.GetField("s");
+        // raw token is "a\nb" — backslash + n, not a real newline
+        string raw = val.GetRawJsonString();
+        await Assert.That(raw).IsEqualTo(@"a\nb");
+    }
+
+    [Test]
+    public async Task GetRawJsonString_EmptyString_ReturnsEmptyString()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":""}""");
+        using var val = doc.GetField("s");
+        await Assert.That(val.GetRawJsonString()).IsEqualTo(string.Empty);
+    }
+
+    [Test]
+    public async Task GetRawJsonStringSpan_MatchesGetString_ForPlainAscii()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"simdjson"}""");
+        using var val = doc.GetField("s");
+        ReadOnlySpan<byte> span = val.GetRawJsonStringSpan();
+        string fromSpan = System.Text.Encoding.UTF8.GetString(span);
+        await Assert.That(fromSpan).IsEqualTo("simdjson");
+    }
+
+    [Test]
+    public async Task GetRawJsonString_NonStringValue_ThrowsSimdJsonException()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":42}""");
+        using var val = doc.GetField("n");
+        await Assert.That(() => val.GetRawJsonString()).Throws<SimdJsonException>();
+    }
+}
+
+public class ForEachAtPathTests
+{
+    [Test]
+    public async Task DocumentForEachAtPath_ArrayWildcard_VisitsAllElements()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""[1,2,3]""");
+        var results = new List<long>();
+        doc.ForEachAtPath("$[*]", v => results.Add(v.GetInt64()));
+        await Assert.That(results).IsEquivalentTo(new List<long> { 1, 2, 3 });
+    }
+
+    [Test]
+    public async Task DocumentForEachAtPath_NestedWildcard_VisitsMatchingValues()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"items":[{"x":10},{"x":20},{"x":30}]}""");
+        var results = new List<long>();
+        doc.ForEachAtPath("$.items[*].x", v => results.Add(v.GetInt64()));
+        await Assert.That(results).IsEquivalentTo(new List<long> { 10, 20, 30 });
+    }
+
+    [Test]
+    public async Task DocumentForEachAtPath_EmptyArray_CallbackNotInvoked()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""[]""");
+        int count = 0;
+        doc.ForEachAtPath("$[*]", _ => count++);
+        await Assert.That(count).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task ValueForEachAtPath_ArrayWildcard_VisitsAllElements()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"arr":[4,5,6]}""");
+        using var arrVal = doc.GetField("arr");
+        var results = new List<long>();
+        arrVal.ForEachAtPath("$[*]", v => results.Add(v.GetInt64()));
+        await Assert.That(results).IsEquivalentTo(new List<long> { 4, 5, 6 });
+    }
+
+    [Test]
+    public async Task DocumentForEachAtPath_ObjectWildcard_VisitsAllFieldValues()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":1,"b":2,"c":3}""");
+        var results = new List<long>();
+        doc.ForEachAtPath("$.*", v => results.Add(v.GetInt64()));
+        await Assert.That(results.Count).IsEqualTo(3);
     }
 }

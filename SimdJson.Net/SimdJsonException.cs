@@ -20,7 +20,10 @@ public sealed class SimdJsonException : Exception
 
     internal static void ThrowIfError(int code)
     {
-        if (code != 0) Throw(code);
+        if (code != 0)
+        {
+            Throw(code);
+        }
     }
 
     internal static void Throw(int code) =>
