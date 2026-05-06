@@ -35,5 +35,6 @@
     <Project Path="Samples/10-RealWorld-LogParser/10-RealWorld-LogParser.csproj" />
     <Project Path="Samples/11-WildcardAndRawString/11-WildcardAndRawString.csproj" />
     <Project Path="Samples/12-DocumentScalarsAndCounting/12-DocumentScalarsAndCounting.csproj" />
+    <Project Path="Samples/13-NdjsonParsing/13-NdjsonParsing.csproj" />
   </Folder>
 </Solution>

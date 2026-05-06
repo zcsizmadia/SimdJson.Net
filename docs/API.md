@@ -11,6 +11,7 @@ Complete reference for the `SimdJson.Net` public API.
 | [JsonValue](JsonValue.md) | A single JSON value — scalar, array, or object |
 | [JsonArray](JsonArray.md) | A JSON array with iteration and index access |
 | [JsonObject](JsonObject.md) | A JSON object with field lookup and iteration |
+| [NdjsonParser](NdjsonParser.md) | Sequential and parallel NDJSON (newline-delimited JSON) parser |
 | [Numbers](Numbers.md) | `JsonNumberType` enum and `JsonNumber` struct |
 | [Types & Errors](Types.md) | `JsonValueKind`, `JsonProperty`, `SimdJsonException` error codes |
 
@@ -174,3 +175,44 @@ obj.ForEachAtPath("$.*", v => results.Add(v.GetString()));
 ```
 
 > The `JsonValue` passed to the callback is **borrowed**: valid only during the callback invocation. Do not dispose or store it.
+
+### NDJSON (newline-delimited JSON)
+
+```csharp
+// Sequential — results arrive in file order
+await foreach (var r in NdjsonParser.ParseAsync(stream, doc =>
+{
+    using var v = doc.GetField("name");
+    return v.GetString();
+}))
+    Console.WriteLine(r);
+
+// Parallel — results arrive in completion order; all CPU cores used
+await foreach (var r in NdjsonParser.ParseParallelAsync(stream, doc =>
+{
+    using var v = doc.GetField("id");
+    return v.GetInt64();
+}))
+    Console.WriteLine(r);
+
+// Side-effect — parallel, no result projection
+await NdjsonParser.ForEachAsync(stream, doc =>
+{
+    using var v = doc.GetField("score");
+    Interlocked.Add(ref total, (long)v.GetDouble());
+});
+
+// Options
+var opts = new NdjsonParserOptions
+{
+    MaxDegreeOfParallelism = 4,  // worker count (default: Environment.ProcessorCount)
+    ChannelCapacity        = 64, // 0 = auto (DOP×4)
+    ReadBufferSize         = 65_536,
+    InitialLineBufferSize  = 4_096,
+    SkipMalformedLines     = true,  // swallow bad JSON silently
+    SkipEmptyLines         = true,
+    LeaveOpen              = false, // dispose stream when done
+};
+```
+
+See [NdjsonParser](NdjsonParser.md) for the full reference.
