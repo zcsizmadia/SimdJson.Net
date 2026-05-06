@@ -54,14 +54,17 @@ typedef int32_t SimdJsonError;
 #define SIMDJSON_BRIDGE_ERR_UNKNOWN           -99
 
 // ─── JSON value types ────────────────────────────────────────────────────────
+// Values match simdjson::ondemand::json_type exactly so that static_cast is
+// a no-op and callers can compare against these constants without surprises.
+// simdjson source: include/simdjson/generic/ondemand/json_type.h
 typedef enum SimdJsonType {
-    SIMDJSON_TYPE_ARRAY   = 0,
-    SIMDJSON_TYPE_OBJECT  = 1,
-    SIMDJSON_TYPE_NUMBER  = 2,
-    SIMDJSON_TYPE_STRING  = 3,
-    SIMDJSON_TYPE_BOOLEAN = 4,
-    SIMDJSON_TYPE_NULL    = 5,
-    SIMDJSON_TYPE_UNKNOWN = 6
+    SIMDJSON_TYPE_UNKNOWN = 0,   // not a real simdjson value; used as sentinel
+    SIMDJSON_TYPE_ARRAY   = 1,   // json_type::array
+    SIMDJSON_TYPE_OBJECT  = 2,   // json_type::object
+    SIMDJSON_TYPE_NUMBER  = 3,   // json_type::number
+    SIMDJSON_TYPE_STRING  = 4,   // json_type::string
+    SIMDJSON_TYPE_BOOLEAN = 5,   // json_type::boolean
+    SIMDJSON_TYPE_NULL    = 6    // json_type::null
 } SimdJsonType;
 
 // ─── JSON number sub-types ───────────────────────────────────────────────────

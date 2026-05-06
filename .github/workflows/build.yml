@@ -145,7 +145,7 @@ jobs:
       - name: Pack NuGet package
         shell: bash
         run: |
-          dotnet pack -c Release -o nupkgs
+          dotnet pack -c Release -o nupkgs SimdJson.Net/SimdJson.Net.csproj
 
       - name: Upload NuGet package artifact
         uses: actions/upload-artifact@v7
