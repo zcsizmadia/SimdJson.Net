@@ -239,6 +239,25 @@ Thrown on any native error. `ErrorCode` holds the raw bridge error code.
 - **WTF-8 strings**: `GetWobblyStringSpan()` returns raw bytes that may contain lone Unicode surrogates. Only use this when round-tripping JSON from runtimes that produce non-standard surrogate sequences.
 - **Dispose discipline**: every `JsonDocument`, `JsonValue`, `JsonArray`, and `JsonObject` holds a native handle. Always dispose them, preferably with `using`.
 
+## Samples
+
+The `Samples/` folder contains runnable console projects, each demonstrating a different part of the API. After building the native library (see [Building the Native Library Locally](#building-the-native-library-locally)), run any sample with `dotnet run --project Samples/<name>`.
+
+| Sample | What it covers |
+|--------|----------------|
+| [01-BasicParsing](Samples/01-BasicParsing/Program.cs) | `Parse(string)`, `Parse(ReadOnlySpan<byte>)`, scalar field reads, indexer syntax, `GetVersion()` |
+| [02-ArrayIteration](Samples/02-ArrayIteration/Program.cs) | `foreach`, `At(index)`, `ElementAt`, `Count`, `IsEmpty`, nested arrays, array of objects |
+| [03-ObjectIteration](Samples/03-ObjectIteration/Program.cs) | `foreach JsonProperty`, `GetField`/`FindField`/`FindFieldUnordered`, `TryGetField`, `ContainsKey`, dynamic `ValueKind` switch |
+| [04-JsonPointerAndPath](Samples/04-JsonPointerAndPath/Program.cs) | RFC 6901 `AtPointer`, `AtPath`, `TryAtPointer`/`TryAtPath` on document / value / array / object |
+| [05-NumberTypes](Samples/05-NumberTypes/Program.cs) | `GetNumberType`, `GetNumber` → `JsonNumber`, `IsNegative`/`IsInteger`, `GetRawJsonToken`, numbers-in-strings helpers |
+| [06-StreamParsing](Samples/06-StreamParsing/Program.cs) | `ParseAsync(Stream)`, `ParseAsync(string)`, `FileStream`, `CancellationToken` |
+| [07-ZeroAllocation](Samples/07-ZeroAllocation/Program.cs) | `GetStringSpan`, UTF-8 literal parse, `ReadOnlySpan<byte>` comparison, `GetRawJsonTokenSpan`, `Minify`, `ValidateUtf8` |
+| [08-ErrorHandling](Samples/08-ErrorHandling/Program.cs) | `SimdJsonException` error codes, lazy On-Demand parse errors, `TryXxx` non-throwing API, `ParseAllowIncompleteJson` |
+| [09-RealWorld-GeoJson](Samples/09-RealWorld-GeoJson/Program.cs) | GeoJSON FeatureCollection — nested objects/arrays, bounding-box calculation, On-Demand forward-iteration discipline |
+| [10-RealWorld-LogParser](Samples/10-RealWorld-LogParser/Program.cs) | NDJSON log stream — parser reuse across lines, aggregation, `TryGetField` for optional fields |
+
+> **On-Demand iteration tip**: simdjson On-Demand is a forward-only streaming parser. Always fully consume a nested object or array before accessing the next sibling field in its parent. See samples 09 and 10 for patterns.
+
 ## Building the Native Library Locally
 
 The `runtimes/` folder is not checked in. After cloning, you need to build the native library before the .NET project will work.
