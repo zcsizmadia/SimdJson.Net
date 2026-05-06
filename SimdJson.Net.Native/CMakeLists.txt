@@ -24,11 +24,21 @@ endif()
 # ─── 1. Fetch simdjson ───────────────────────────────────────────────────────
 # simdjson is fetched at configure time and compiled as a STATIC library that
 # gets fully linked into (and hidden inside) our SHARED bridge library.
+
+# Read SimdJsonVersion from Directory.Build.props — single source of truth.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../Directory.Build.props" _build_props)
+string(REGEX MATCH "<SimdJsonVersion>([^<]+)</SimdJsonVersion>" _ "${_build_props}")
+set(SIMDJSON_VERSION "${CMAKE_MATCH_1}")
+if(NOT SIMDJSON_VERSION)
+    message(FATAL_ERROR "Could not extract SimdJsonVersion from Directory.Build.props")
+endif()
+message(STATUS "Found simdjson version in Directory.Build.props: ${SIMDJSON_VERSION}")
+
 include(FetchContent)
 FetchContent_Declare(
     simdjson
     GIT_REPOSITORY https://github.com/simdjson/simdjson.git
-    GIT_TAG        v4.6.3        # matches SimdJsonVersion in Directory.Build.props
+    GIT_TAG        "v${SIMDJSON_VERSION}"
     GIT_SHALLOW    TRUE
 )
 
