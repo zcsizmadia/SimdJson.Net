@@ -1,14 +1,11 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
-    <TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>
-    <IsPackable>false</IsPackable>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <IsTestProject>true</IsTestProject>
     <!-- TUnit uses the Microsoft Testing Platform runner -->
     <EnableMSTestRunner>true</EnableMSTestRunner>
     <OutputType>Exe</OutputType>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
   <ItemGroup>
