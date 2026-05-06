@@ -1,0 +1,50 @@
+{
+  "version": 3,
+  "cmakeMinimumRequired": { "major": 3, "minor": 20, "patch": 0 },
+  "configurePresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug (win-x64)",
+      "description": "Debug build. cmake --install writes SimdJsonNative.dll to SimdJson.Net/runtimes/win-x64/native/.",
+      "binaryDir": "${sourceDir}/build",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/../SimdJson.Net/runtimes/win-x64/native"
+      }
+    },
+    {
+      "name": "release",
+      "displayName": "Release (win-x64)",
+      "description": "Release build. cmake --install writes SimdJsonNative.dll to SimdJson.Net/runtimes/win-x64/native/.",
+      "binaryDir": "${sourceDir}/build-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "CMAKE_INSTALL_PREFIX": "${sourceDir}/../SimdJson.Net/runtimes/win-x64/native"
+      }
+    }
+  ],
+  "buildPresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug (win-x64)",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "displayName": "Release (win-x64)",
+      "configurePreset": "release"
+    }
+  ],
+  "installPresets": [
+    {
+      "name": "debug",
+      "displayName": "Debug (win-x64)",
+      "configurePreset": "debug"
+    },
+    {
+      "name": "release",
+      "displayName": "Release (win-x64)",
+      "configurePreset": "release"
+    }
+  ]
+}

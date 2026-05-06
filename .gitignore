@@ -114,4 +114,4 @@ runtimes/
 # NuGet output
 nupkgs/
 
-SimdJsonNative/build/
+SimdJson.Net.Native/build/

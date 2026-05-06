@@ -13,7 +13,25 @@
     <File Path="Directory.Build.props" />
     <File Path="Directory.Packages.props" />
   </Folder>
+  <Folder Name="/SimdJson.Net.Native/">
+    <File Path="SimdJson.Net.Native/CMakePresets.json" />
+    <File Path="SimdJson.Net.Native/CMakeLists.txt" />
+    <File Path="SimdJson.Net.Native/include/simdjson_native.h" />
+    <File Path="SimdJson.Net.Native/src/simdjson_native.cpp" />
+  </Folder>
   <Project Path="SimdJson.Net/SimdJson.Net.csproj" />
   <Project Path="SimdJson.Net.Tests/SimdJson.Net.Tests.csproj" />
   <Project Path="SimdJson.Net.Benchmark/SimdJson.Net.Benchmark.csproj" />
+  <Folder Name="/Samples/">
+    <Project Path="Samples/01-BasicParsing/01-BasicParsing.csproj" />
+    <Project Path="Samples/02-ArrayIteration/02-ArrayIteration.csproj" />
+    <Project Path="Samples/03-ObjectIteration/03-ObjectIteration.csproj" />
+    <Project Path="Samples/04-JsonPointerAndPath/04-JsonPointerAndPath.csproj" />
+    <Project Path="Samples/05-NumberTypes/05-NumberTypes.csproj" />
+    <Project Path="Samples/06-StreamParsing/06-StreamParsing.csproj" />
+    <Project Path="Samples/07-ZeroAllocation/07-ZeroAllocation.csproj" />
+    <Project Path="Samples/08-ErrorHandling/08-ErrorHandling.csproj" />
+    <Project Path="Samples/09-RealWorld-GeoJson/09-RealWorld-GeoJson.csproj" />
+    <Project Path="Samples/10-RealWorld-LogParser/10-RealWorld-LogParser.csproj" />
+  </Folder>
 </Solution>

@@ -89,35 +89,19 @@ jobs:
       - name: Build simdjson native library
         shell: bash
         run: |
-          cd SimdJsonNative
-          mkdir -p build/${{ matrix.runtimeId }}
-          # 1. MSVC is a multi-config generator; Release is selected at --build time.
-          # 2. Single-config generator (Makefiles / Ninja on Linux & macOS).
-          #    CMAKE_BUILD_TYPE must be set at configure time; --config is ignored.
-          cmake -S . -B build/${{ matrix.runtimeId }} -DCMAKE_BUILD_TYPE=Release
-          cmake --build build/${{ matrix.runtimeId }} --config Release
-
-      - name: Copy native library to runtimes
-        shell: bash
-        run: |
-          RUNTIMES_SRC_DIR="SimdJson.Net/runtimes/${{ matrix.runtimeId }}/native"
-          mkdir -p "$RUNTIMES_SRC_DIR"
-
-          case "${{ matrix.runtimeId }}" in
-            win*)
-              cp -L "SimdJsonNative/build/${{ matrix.runtimeId }}/Release/SimdJsonNative.dll" "$RUNTIMES_SRC_DIR/"
-              ;;
-            linux*)
-              cp -L "SimdJsonNative/build/${{ matrix.runtimeId }}/SimdJsonNative.so" "$RUNTIMES_SRC_DIR/"
-              ;;
-            osx*)
-              cp -L "SimdJsonNative/build/${{ matrix.runtimeId }}/SimdJsonNative.dylib" "$RUNTIMES_SRC_DIR/"
-              ;;
-            *)
-              echo "Unsupported runtime ID: ${{ matrix.runtimeId }}"
-              exit 1
-              ;;
-          esac
+          # Absolute path is required for CMAKE_INSTALL_PREFIX — relative paths
+          # are resolved from the build directory, not the working directory.
+          RUNTIMES_DIR="$(pwd)/SimdJson.Net/runtimes/${{ matrix.runtimeId }}/native"
+          mkdir -p "$RUNTIMES_DIR"
+          # 1. MSVC is a multi-config generator; Release is selected at --build/--install time.
+          # 2. Single-config generators (Makefiles / Ninja on Linux & macOS) need
+          #    CMAKE_BUILD_TYPE at configure time; --config is ignored there.
+          # CMAKE_INSTALL_PREFIX is baked in at configure time so --install needs no --prefix flag.
+          cmake -S SimdJson.Net.Native -B SimdJson.Net.Native/build/${{ matrix.runtimeId }} \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DCMAKE_INSTALL_PREFIX="$RUNTIMES_DIR"
+          cmake --build SimdJson.Net.Native/build/${{ matrix.runtimeId }} --config Release
+          cmake --install SimdJson.Net.Native/build/${{ matrix.runtimeId }} --config Release
 
       - name: Build .NET library
         shell: bash

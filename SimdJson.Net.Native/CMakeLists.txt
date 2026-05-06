@@ -24,17 +24,29 @@ endif()
 # ─── 1. Fetch simdjson ───────────────────────────────────────────────────────
 # simdjson is fetched at configure time and compiled as a STATIC library that
 # gets fully linked into (and hidden inside) our SHARED bridge library.
+
+# Read SimdJsonVersion from Directory.Build.props — single source of truth.
+file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../Directory.Build.props" _build_props)
+string(REGEX MATCH "<SimdJsonVersion>([^<]+)</SimdJsonVersion>" _ "${_build_props}")
+set(SIMDJSON_VERSION "${CMAKE_MATCH_1}")
+if(NOT SIMDJSON_VERSION)
+    message(FATAL_ERROR "Could not extract SimdJsonVersion from Directory.Build.props")
+endif()
+message(STATUS "Found simdjson version in Directory.Build.props: ${SIMDJSON_VERSION}")
+
 include(FetchContent)
 FetchContent_Declare(
     simdjson
     GIT_REPOSITORY https://github.com/simdjson/simdjson.git
-    GIT_TAG        v4.6.3        # matches SimdJsonVersion in Directory.Build.props
+    GIT_TAG        "v${SIMDJSON_VERSION}"
     GIT_SHALLOW    TRUE
 )
 
 # Tell simdjson's own CMake to produce a static archive only.
 set(BUILD_SHARED_LIBS         OFF CACHE BOOL "" FORCE)  # make simdjson build static
 set(SIMDJSON_DEVELOPER_MODE   OFF CACHE BOOL "" FORCE)
+# Enable the experimental incomplete-JSON parsing API used by SimdJsonNative_ParseAllowIncompleteJson.
+add_compile_definitions(SIMDJSON_EXPERIMENTAL_ALLOW_INCOMPLETE_JSON)
 
 FetchContent_MakeAvailable(simdjson)
 
@@ -97,12 +109,12 @@ set_target_properties(SimdJsonNative PROPERTIES
     OUTPUT_NAME "SimdJsonNative"
 )
 
-# ─── 5. Optional install rules ───────────────────────────────────────────────
-include(GNUInstallDirs)
+# ─── 5. Install rules ────────────────────────────────────────────────────────
+# DESTINATION "." means files land directly in CMAKE_INSTALL_PREFIX with no
+# bin/ or lib/ subdirectory.  In CI, --prefix is set to
+#   SimdJson.Net/runtimes/<runtimeId>/native
+# so the DLL/so/dylib ends up exactly where the NuGet layout expects it.
 install(TARGETS SimdJsonNative
-    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}   # .dll on Windows
-    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}   # .so / .dylib
-)
-install(FILES include/simdjson_native.h
-    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+    RUNTIME DESTINATION .   # .dll on Windows
+    LIBRARY DESTINATION .   # .so / .dylib on Linux / macOS
 )

@@ -52,76 +52,71 @@ Console.WriteLine(SimdJsonParser.GetVersion()); // e.g. "4.6.3"
 dotnet add package SimdJson.Net
 ```
 
-## API Reference
+## Documentation
 
-### `SimdJsonParser`
+Full API reference and design notes live in the [`docs/`](docs/) folder:
 
-| Member | Description |
-|--------|-------------|
-| `SimdJsonParser.Shared` | Thread-local instance — do not dispose |
-| `new SimdJsonParser()` | Create a new parser (one per thread) |
-| `Parse(ReadOnlySpan<byte>)` | Parse UTF-8 bytes directly (zero-copy) |
-| `Parse(string)` | Parse a .NET string (UTF-8 transcoding on stack/pool) |
-| `ParseAsync(string, CancellationToken)` | Parse a string on the thread pool |
-| `ParseAsync(Stream, CancellationToken)` | Read stream then parse |
-| `GetVersion()` | Returns simdjson version string (e.g. `"4.6.3"`) |
+| Document | Contents |
+|----------|----------|
+| [docs/API.md](docs/API.md) | API index, quick-lookup cheatsheet |
+| [docs/SimdJsonParser.md](docs/SimdJsonParser.md) | Parser — `Parse`, `ParseAsync`, utilities |
+| [docs/JsonDocument.md](docs/JsonDocument.md) | Document root — field access, pointers, rewind |
+| [docs/JsonValue.md](docs/JsonValue.md) | Value — scalar getters, numbers, raw JSON |
+| [docs/JsonArray.md](docs/JsonArray.md) | Array — iteration, index access, `Count`, `IsEmpty` |
+| [docs/JsonObject.md](docs/JsonObject.md) | Object — `GetField`, `FindField`, `ContainsKey`, iteration |
+| [docs/Numbers.md](docs/Numbers.md) | `JsonNumberType`, `JsonNumber` struct |
+| [docs/Types.md](docs/Types.md) | `JsonValueKind`, `JsonProperty`, `SimdJsonException` error codes |
+| [docs/DesignNotes.md](docs/DesignNotes.md) | Thread safety, forward-only iteration, dispose rules, pitfalls |
 
-### `JsonDocument` *(IDisposable)*
+## Samples
 
-| Member | Description |
-|--------|-------------|
-| `ValueKind` | `JsonValueKind` of the document root |
-| `GetArray()` | Root as `JsonArray` |
-| `GetObject()` | Root as `JsonObject` |
-| `GetField(string)` | Field by name (root must be object) |
-| `AtPointer(string)` | RFC 6901 JSON Pointer lookup |
-| `this[string]` | Indexer — same as `GetField` |
+The `Samples/` folder contains runnable console projects, each demonstrating a different part of the API. After building the native library (see [Building the Native Library Locally](#building-the-native-library-locally)), run any sample with `dotnet run --project Samples/<name>`.
 
-### `JsonValue` *(IDisposable)*
+| Sample | What it covers |
+|--------|----------------|
+| [01-BasicParsing](Samples/01-BasicParsing/Program.cs) | `Parse(string)`, `Parse(ReadOnlySpan<byte>)`, scalar field reads, indexer syntax, `GetVersion()` |
+| [02-ArrayIteration](Samples/02-ArrayIteration/Program.cs) | `foreach`, `At(index)`, `ElementAt`, `Count`, `IsEmpty`, nested arrays, array of objects |
+| [03-ObjectIteration](Samples/03-ObjectIteration/Program.cs) | `foreach JsonProperty`, `GetField`/`FindField`/`FindFieldUnordered`, `TryGetField`, `ContainsKey`, dynamic `ValueKind` switch |
+| [04-JsonPointerAndPath](Samples/04-JsonPointerAndPath/Program.cs) | RFC 6901 `AtPointer`, `AtPath`, `TryAtPointer`/`TryAtPath` on document / value / array / object |
+| [05-NumberTypes](Samples/05-NumberTypes/Program.cs) | `GetNumberType`, `GetNumber` → `JsonNumber`, `IsNegative`/`IsInteger`, `GetRawJsonToken`, numbers-in-strings helpers |
+| [06-StreamParsing](Samples/06-StreamParsing/Program.cs) | `ParseAsync(Stream)`, `ParseAsync(string)`, `FileStream`, `CancellationToken` |
+| [07-ZeroAllocation](Samples/07-ZeroAllocation/Program.cs) | `GetStringSpan`, UTF-8 literal parse, `ReadOnlySpan<byte>` comparison, `GetRawJsonTokenSpan`, `Minify`, `ValidateUtf8` |
+| [08-ErrorHandling](Samples/08-ErrorHandling/Program.cs) | `SimdJsonException` error codes, lazy On-Demand parse errors, `TryXxx` non-throwing API, `ParseAllowIncompleteJson` |
+| [09-RealWorld-GeoJson](Samples/09-RealWorld-GeoJson/Program.cs) | GeoJSON FeatureCollection — nested objects/arrays, bounding-box calculation, On-Demand forward-iteration discipline |
+| [10-RealWorld-LogParser](Samples/10-RealWorld-LogParser/Program.cs) | NDJSON log stream — parser reuse across lines, aggregation, `TryGetField` for optional fields |
 
-| Member | Description |
-|--------|-------------|
-| `ValueKind` | `JsonValueKind` of this value |
-| `GetString()` | As `string` |
-| `GetStringSpan()` | As `ReadOnlySpan<byte>` (zero allocation) |
-| `GetDouble()` | As `double` |
-| `GetInt64()` | As `long` |
-| `GetUInt64()` | As `ulong` |
-| `GetBool()` | As `bool` |
-| `IsNull()` | Returns `true` if JSON null |
-| `GetArray()` | As `JsonArray` |
-| `GetObject()` | As `JsonObject` |
-| `GetField(string)` / `this[string]` | Field by name |
+> **On-Demand iteration tip**: simdjson On-Demand is a forward-only streaming parser. Always fully consume a nested object or array before accessing the next sibling field in its parent. See samples 09 and 10 for patterns.
 
-### `JsonArray` *(IDisposable, IEnumerable\<JsonValue\>)*
+## Building the Native Library Locally
 
-| Member | Description |
-|--------|-------------|
-| `Count` | Number of elements (full scan) |
-| `foreach` | Iterate elements as `JsonValue` |
+The `runtimes/` folder is not checked in. After cloning, you need to build the native library before the .NET project will work.
 
-### `JsonObject` *(IDisposable, IEnumerable\<JsonProperty\>)*
+### Windows (Visual Studio 2022)
 
-| Member | Description |
-|--------|-------------|
-| `Count` | Number of fields (full scan) |
-| `GetField(string)` / `this[string]` | Field by name |
-| `foreach` | Iterate as `JsonProperty` (`Name` + `Value`) |
+Open the solution — the `SimdJson.Net.Native/` solution folder contains the CMake project. VS 2022 detects `CMakePresets.json` automatically.
 
-### `JsonValueKind`
+1. Select the **Debug (win-x64)** preset in the CMake toolbar (top of the IDE).
+2. **Build → Build All** to compile the native library.
+3. **Build → Install SimdJsonNative** to run `cmake --install` — this writes `SimdJsonNative.dll` directly into `SimdJson.Net/runtimes/win-x64/native/`.
+4. Build / run the .NET project normally.
 
-`Array`, `Object`, `Number`, `String`, `Boolean`, `Null`, `Unknown`
+> The install step is required once after every CMake rebuild. Steps 2 and 3 can also be triggered by right-clicking `CMakeLists.txt` in Solution Explorer.
 
-### `SimdJsonException`
+### Command Line (all platforms)
 
-Thrown on any native error. `ErrorCode` holds the raw bridge error code.
+```bash
+RID=win-x64   # or linux-x64, osx-arm64, etc.
+INSTALL_DIR="$(pwd)/SimdJson.Net/runtimes/$RID/native"
+mkdir -p "$INSTALL_DIR"
 
-## Design Notes
+cmake -S SimdJson.Net.Native -B SimdJson.Net.Native/build \
+  -DCMAKE_BUILD_TYPE=Debug \
+  -DCMAKE_INSTALL_PREFIX="$INSTALL_DIR"
+cmake --build   SimdJson.Net.Native/build
+cmake --install SimdJson.Net.Native/build
+```
 
-- **One parser per thread**: simdjson On-Demand parsers are not thread-safe. Use `SimdJsonParser.Shared` for effortless thread-local access.
-- **One document at a time**: a single parser instance can only have one live `JsonDocument`. Dispose the document before parsing the next one.
-- **Forward-only iteration**: simdjson On-Demand is a streaming parser. Accessing fields in a different order than they appear in the JSON, or iterating an already-consumed iterator, may throw `SimdJsonException`.
-- **Dispose discipline**: every `JsonDocument`, `JsonValue`, `JsonArray`, and `JsonObject` holds a native handle. Always dispose them, preferably with `using`.
+Then `dotnet build` / `dotnet test` as normal.
 
 ## Supported Runtimes
 
@@ -146,3 +141,4 @@ The native `SimdJsonNative` shared library wraps [simdjson](https://github.com/s
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
