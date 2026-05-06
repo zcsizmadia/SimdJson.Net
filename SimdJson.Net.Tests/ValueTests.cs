@@ -247,4 +247,178 @@ public class ValueCountAndNativeIntTests
     }
 }
 
+// ─── TryGet failure paths and other coverage gaps ───────────────────────────────
+
+public class TryGetFailureTests
+{
+    [Test]
+    public async Task TryGetString_OnNumber_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":42}""");
+        using var val = doc.GetField("n");
+        await Assert.That(val.TryGetString(out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task TryGetInt64_OnString_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"text"}""");
+        using var val = doc.GetField("s");
+        await Assert.That(val.TryGetInt64(out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task TryGetDouble_OnString_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"text"}""");
+        using var val = doc.GetField("s");
+        await Assert.That(val.TryGetDouble(out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task TryGetFloat_OnString_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"text"}""");
+        using var val = doc.GetField("s");
+        await Assert.That(val.TryGetFloat(out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task TryGetBool_OnNumber_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":42}""");
+        using var val = doc.GetField("n");
+        await Assert.That(val.TryGetBool(out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task TryGetUInt64_OnNegative_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":-1}""");
+        using var val = doc.GetField("n");
+        await Assert.That(val.TryGetUInt64(out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task TryGetArray_OnNumber_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":42}""");
+        using var val = doc.GetField("n");
+        await Assert.That(val.TryGetArray(out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task TryGetObject_OnNumber_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":42}""");
+        using var val = doc.GetField("n");
+        await Assert.That(val.TryGetObject(out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task GetString_AllowReplacementFalse_ReturnsString()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"hello"}""");
+        using var val = doc.GetField("s");
+        await Assert.That(val.GetString(allowReplacement: false)).IsEqualTo("hello");
+    }
+
+    [Test]
+    public async Task GetStringSpan_AllowReplacementFalse_ReturnsBytes()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"world"}""");
+        using var val = doc.GetField("s");
+        var span = val.GetStringSpan(allowReplacement: false);
+        await Assert.That(Encoding.UTF8.GetString(span)).IsEqualTo("world");
+    }
+
+    [Test]
+    public async Task TryGetDoubleInString_InvalidString_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"notanumber"}""");
+        using var val = doc.GetField("s");
+        await Assert.That(val.TryGetDoubleInString(out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task TryGetInt64InString_ValidString_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"42"}""");
+        using var val = doc.GetField("s");
+        bool ok = val.TryGetInt64InString(out long result);
+        await Assert.That(ok).IsTrue();
+        await Assert.That(result).IsEqualTo(42L);
+    }
+
+    [Test]
+    public async Task TryGetUInt64InString_ValidString_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"123"}""");
+        using var val = doc.GetField("s");
+        bool ok = val.TryGetUInt64InString(out ulong result);
+        await Assert.That(ok).IsTrue();
+        await Assert.That(result).IsEqualTo(123UL);
+    }
+
+    [Test]
+    public async Task TryGetUInt64InString_InvalidString_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"notanumber"}""");
+        using var val = doc.GetField("s");
+        await Assert.That(val.TryGetUInt64InString(out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task TryAtPointer_ValidPath_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"obj":{"b":99}}""");
+        using var obj = doc.GetField("obj");
+        var ok = obj.TryAtPointer("/b", out var result);
+        using var val = result!;
+        await Assert.That(ok).IsTrue();
+        await Assert.That(val.GetInt64()).IsEqualTo(99L);
+    }
+
+    [Test]
+    public async Task TryAtPath_ValidPath_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"obj":{"b":77}}""");
+        using var obj = doc.GetField("obj");
+        var ok = obj.TryAtPath("$.b", out var result);
+        using var val = result!;
+        await Assert.That(ok).IsTrue();
+        await Assert.That(val.GetInt64()).IsEqualTo(77L);
+    }
+
+    [Test]
+    public async Task TryAtPath_InvalidPath_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"obj":{"b":99}}""");
+        using var obj = doc.GetField("obj");
+        var ok = obj.TryAtPath("$.missing", out var result);
+        await Assert.That(ok).IsFalse();
+        await Assert.That(result).IsNull();
+    }
+
+    [Test]
+    public async Task TryFindFieldUnordered_ValidKey_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"obj":{"x":55}}""");
+        using var obj = doc.GetField("obj");
+        var ok = obj.TryFindFieldUnordered("x", out var result);
+        using var val = result!;
+        await Assert.That(ok).IsTrue();
+        await Assert.That(val.GetInt64()).IsEqualTo(55L);
+    }
+
+    [Test]
+    public async Task GetWobblyStringSpan_StringValue_ReturnsCorrectBytes()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"hello"}""");
+        using var val = doc.GetField("s");
+        var span = val.GetWobblyStringSpan();
+        await Assert.That(Encoding.UTF8.GetString(span)).IsEqualTo("hello");
+    }
+}
+
 // ─── GetRawJsonSpan on array and object ──────────────────────────────────────

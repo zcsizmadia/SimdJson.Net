@@ -207,4 +207,84 @@ public class ArrayPointerPathTests
     }
 }
 
-// ─── New gap-filling tests ────────────────────────────────────────────────────
+// ─── ElementAt / TryAtPath gap-filling tests ────────────────────────────────────
+
+public class ArrayElementAtTests
+{
+    [Test]
+    public async Task ElementAt_Index0_ReturnsFirstElement()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("[10,20,30]");
+        using var arr = doc.GetArray();
+        using var val = arr.ElementAt(0);
+        await Assert.That(val.GetInt64()).IsEqualTo(10L);
+    }
+
+    [Test]
+    public async Task ElementAt_MiddleIndex_SkipsElements()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("[10,20,30,40,50]");
+        using var arr = doc.GetArray();
+        using var val = arr.ElementAt(2);
+        await Assert.That(val.GetInt64()).IsEqualTo(30L);
+    }
+
+    [Test]
+    public async Task ElementAt_LastIndex_ReturnsLastElement()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("[10,20,30]");
+        using var arr = doc.GetArray();
+        using var val = arr.ElementAt(2);
+        await Assert.That(val.GetInt64()).IsEqualTo(30L);
+    }
+
+    [Test]
+    public async Task ElementAt_OutOfBounds_ThrowsSimdJsonException()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("[1,2,3]");
+        using var arr = doc.GetArray();
+        await Assert.That(() => { using var v = arr.ElementAt(99); })
+            .Throws<SimdJsonException>();
+    }
+
+    [Test]
+    public async Task ElementAt_NegativeIndex_ThrowsArgumentOutOfRangeException()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("[1,2,3]");
+        using var arr = doc.GetArray();
+        await Assert.That(() => { using var v = arr.ElementAt(-1); })
+            .Throws<ArgumentOutOfRangeException>();
+    }
+
+    [Test]
+    public async Task TryAtPointer_ValidPath_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""[{"name":"Alice"},{"name":"Bob"}]""");
+        using var arr = doc.GetArray();
+        var ok = arr.TryAtPointer("/1/name", out var v);
+        using var val = v!;
+        await Assert.That(ok).IsTrue();
+        await Assert.That(val.GetString()).IsEqualTo("Bob");
+    }
+
+    [Test]
+    public async Task TryAtPath_ValidPath_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("[10,20,30]");
+        using var arr = doc.GetArray();
+        var ok = arr.TryAtPath("$[1]", out var v);
+        using var val = v!;
+        await Assert.That(ok).IsTrue();
+        await Assert.That(val.GetInt64()).IsEqualTo(20L);
+    }
+
+    [Test]
+    public async Task TryAtPath_InvalidPath_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("[1,2,3]");
+        using var arr = doc.GetArray();
+        var ok = arr.TryAtPath("$[99].missing", out var v);
+        await Assert.That(ok).IsFalse();
+        await Assert.That(v).IsNull();
+    }
+}

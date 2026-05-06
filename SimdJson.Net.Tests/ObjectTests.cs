@@ -245,3 +245,93 @@ public class FindFieldUnorderedTests
         await Assert.That(val).IsNull();
     }
 }
+// ─── Object extra coverage tests ──────────────────────────────────────────────
+
+public class ObjectExtraTests
+{
+    [Test]
+    public async Task TryGetField_MissingKey_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":1}""");
+        using var obj = doc.GetObject();
+        var ok = obj.TryGetField("missing", out var v);
+        await Assert.That(ok).IsFalse();
+        await Assert.That(v).IsNull();
+    }
+
+    [Test]
+    public async Task ContainsKey_MissingKey_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":1}""");
+        using var obj = doc.GetObject();
+        await Assert.That(obj.ContainsKey("missing")).IsFalse();
+    }
+
+    [Test]
+    public async Task ObjectAtPointer_ReturnsCorrectValue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":{"b":42}}""");
+        using var obj = doc.GetObject();
+        using var val = obj.AtPointer("/a/b");
+        await Assert.That(val.GetInt64()).IsEqualTo(42L);
+    }
+
+    [Test]
+    public async Task ObjectAtPath_ReturnsCorrectValue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":{"b":42}}""");
+        using var obj = doc.GetObject();
+        using var val = obj.AtPath("$.a.b");
+        await Assert.That(val.GetInt64()).IsEqualTo(42L);
+    }
+
+    [Test]
+    public async Task ObjectTryAtPointer_ValidPath_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":{"b":7}}""");
+        using var obj = doc.GetObject();
+        var ok = obj.TryAtPointer("/a/b", out var v);
+        using var val = v!;
+        await Assert.That(ok).IsTrue();
+        await Assert.That(val.GetInt64()).IsEqualTo(7L);
+    }
+
+    [Test]
+    public async Task ObjectTryAtPath_ValidPath_ReturnsTrue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"x":99}""");
+        using var obj = doc.GetObject();
+        var ok = obj.TryAtPath("$.x", out var v);
+        using var val = v!;
+        await Assert.That(ok).IsTrue();
+        await Assert.That(val.GetInt64()).IsEqualTo(99L);
+    }
+
+    [Test]
+    public async Task ObjectTryAtPath_InvalidPath_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"x":99}""");
+        using var obj = doc.GetObject();
+        var ok = obj.TryAtPath("$.missing", out var v);
+        await Assert.That(ok).IsFalse();
+        await Assert.That(v).IsNull();
+    }
+
+    [Test]
+    public async Task ObjectFindField_ReturnsCorrectValue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"score":8.5}""");
+        using var obj = doc.GetObject();
+        using var val = obj.FindField("score");
+        await Assert.That(val.GetDouble()).IsEqualTo(8.5);
+    }
+
+    [Test]
+    public async Task ObjectFindFieldUnordered_ReturnsCorrectValue()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"c":3,"b":2,"a":1}""");
+        using var obj = doc.GetObject();
+        using var val = obj.FindFieldUnordered("a");
+        await Assert.That(val.GetInt64()).IsEqualTo(1L);
+    }
+}

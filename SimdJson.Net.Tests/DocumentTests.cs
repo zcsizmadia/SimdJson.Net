@@ -333,4 +333,58 @@ public class CurrentDepthTests
     }
 }
 
+// ─── Document extra coverage tests ─────────────────────────────────────────────
+
+public class DocumentExtraStringTests
+{
+    [Test]
+    public async Task GetString_AllowReplacementFalse_RedirectsToGetString()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("\"hello\"");
+        await Assert.That(doc.GetString(allowReplacement: false)).IsEqualTo("hello");
+    }
+
+    [Test]
+    public async Task GetStringSpan_RootString_ReturnsUtf8Bytes()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("\"world\"");
+        var span = doc.GetStringSpan();
+        await Assert.That(Encoding.UTF8.GetString(span)).IsEqualTo("world");
+    }
+
+    [Test]
+    public async Task GetWobblyStringSpan_RootString_ReturnsBytes()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("\"hello\"");
+        var span = doc.GetWobblyStringSpan();
+        await Assert.That(Encoding.UTF8.GetString(span)).IsEqualTo("hello");
+    }
+
+    [Test]
+    public async Task CurrentOffset_AfterParse_IsNonNegative()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"x":1}""");
+        var offset = doc.CurrentOffset();
+        await Assert.That((long)(nuint)offset).IsGreaterThanOrEqualTo(0L);
+    }
+
+    [Test]
+    public async Task TryGetField_MissingKey_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":1}""");
+        var ok = doc.TryGetField("missing", out var v);
+        await Assert.That(ok).IsFalse();
+        await Assert.That(v).IsNull();
+    }
+
+    [Test]
+    public async Task TryAtPointer_MissingPath_ReturnsFalse()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":1}""");
+        var ok = doc.TryAtPointer("/missing", out var v);
+        await Assert.That(ok).IsFalse();
+        await Assert.That(v).IsNull();
+    }
+}
+
 // ─── Parser configuration tests ──────────────────────────────────────────────

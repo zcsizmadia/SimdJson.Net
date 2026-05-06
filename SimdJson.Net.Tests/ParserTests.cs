@@ -112,6 +112,42 @@ public class ParserConfigurationTests
     }
 }
 
+// ─── Utility method coverage tests ──────────────────────────────────────────────
+
+public class ValidateUtf8ExtraTests
+{
+    [Test]
+    public async Task ValidateUtf8_StringOverload_ValidText_ReturnsTrue()
+    {
+        await Assert.That(SimdJsonParser.ValidateUtf8("hello world")).IsTrue();
+    }
+
+    [Test]
+    public async Task ValidateUtf8_StringOverload_EmptyString_ReturnsTrue()
+    {
+        await Assert.That(SimdJsonParser.ValidateUtf8(string.Empty)).IsTrue();
+    }
+
+    [Test]
+    public async Task ValidateUtf8_EmptyByteSpan_ReturnsTrue()
+    {
+        await Assert.That(SimdJsonParser.ValidateUtf8(Array.Empty<byte>())).IsTrue();
+    }
+
+    [Test]
+    public async Task ParseAllowIncompleteJson_LargeString_UsesArrayPoolPath()
+    {
+        // > 4096 bytes triggers the ArrayPool branch in ParseAllowIncompleteJson(string)
+        var padding = new string('z', 5000);
+
+        var jsonStr = "{\"key\":\"" + padding + "\"}";
+        using var parser = new SimdJsonParser();
+        using var doc = parser.ParseAllowIncompleteJson(jsonStr);
+        using var val = doc.GetField("key");
+        await Assert.That(val.GetString()).IsEqualTo(padding);
+    }
+}
+
 // ─── Array AtPointer / AtPath tests ──────────────────────────────────────────
 
 public class RewindTests
