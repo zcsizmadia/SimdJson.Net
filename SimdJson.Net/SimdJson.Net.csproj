@@ -27,17 +27,14 @@
   <ItemGroup>
     <None Include="../LICENSE" Pack="true" PackagePath="" />
     <None Include="../README.md" Pack="true" PackagePath="" />
-    <None Include="runtimes/**" Pack="true" PackagePath="runtimes/" />
-  </ItemGroup>
-
-  <!-- Copy native binaries to the output directory so NativeLoader can find them.
-       Pack="false" prevents MSBuild from also adding these to content/ and contentFiles/
-       in the NuGet package — the None item above already packs them under runtimes/. -->
-  <ItemGroup>
-    <Content Include="runtimes/**"
-             CopyToOutputDirectory="PreserveNewest"
-             LinkBase="runtimes\"
-             Pack="false" />
+    <!-- Pack into runtimes/ in the .nupkg AND copy to the output dir for local runs.
+         Using a single None item avoids the Content item's default content/ and
+         contentFiles/ pack paths that would otherwise duplicate the binaries. -->
+    <None Include="runtimes/**"
+          Pack="true"
+          PackagePath="runtimes/"
+          CopyToOutputDirectory="PreserveNewest"
+          LinkBase="runtimes\" />
   </ItemGroup>
 
 </Project>
