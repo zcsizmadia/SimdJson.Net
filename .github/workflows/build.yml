@@ -64,7 +64,6 @@ jobs:
           if [ -f /etc/alpine-release ]; then
             apk add --no-cache \
               build-base cmake git curl tar bash icu pkgconf
-              #build-base cmake git ninja curl zip unzip tar bash icu pkgconf patchelf linux-headers
           fi
 
       # Install .NET SDKs to extract the SimdJson version from the csproj file,
