@@ -181,6 +181,146 @@ public sealed class JsonDocument : IDisposable
         return Encoding.UTF8.GetString(ptr, (int)len);
     }
 
+    /// <summary>Returns the full raw JSON of the document root as a <see cref="ReadOnlySpan{T}"/> without allocating a string.</summary>
+    public unsafe ReadOnlySpan<byte> GetRawJsonSpan()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentRawJson(Handle, out byte* ptr, out nuint len));
+        return new ReadOnlySpan<byte>(ptr, (int)len);
+    }
+
+    // ── Number helpers ────────────────────────────────────────────────────────
+
+    // ── Scalar root getters ───────────────────────────────────────────────────
+
+    /// <summary>Gets the document root as a <see cref="string"/>. Throws if root is not a JSON string.</summary>
+    public unsafe string GetString()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetString(Handle, out byte* ptr, out nuint len));
+        return Encoding.UTF8.GetString(ptr, (int)len);
+    }
+
+    /// <summary>
+    /// Gets the document root as a <see cref="string"/>, replacing invalid UTF-8 sequences with U+FFFD.
+    /// Throws if root is not a JSON string.
+    /// </summary>
+    public unsafe string GetString(bool allowReplacement)
+    {
+        if (!allowReplacement)
+        {
+            return GetString();
+        }
+
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetStringAllowReplacement(Handle, out byte* ptr, out nuint len));
+        return Encoding.UTF8.GetString(ptr, (int)len);
+    }
+
+    /// <summary>Gets the document root as a UTF-8 byte span. Throws if root is not a JSON string.</summary>
+    public unsafe ReadOnlySpan<byte> GetStringSpan()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetString(Handle, out byte* ptr, out nuint len));
+        return new ReadOnlySpan<byte>(ptr, (int)len);
+    }
+
+    /// <summary>Gets the document root as a <see cref="bool"/>. Throws if root is not a boolean.</summary>
+    public bool GetBool()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetBool(Handle, out int v));
+        return v != 0;
+    }
+
+    /// <summary>Returns <see langword="true"/> if the document root is a JSON null.</summary>
+    public bool IsNull()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentIsNull(Handle, out int v));
+        return v != 0;
+    }
+
+    /// <summary>Gets the document root as a <see cref="double"/>. Throws if root is not a number.</summary>
+    public double GetDouble()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetDouble(Handle, out double v));
+        return v;
+    }
+
+    /// <summary>Gets the document root as a <see cref="long"/>. Throws if root is not an integer.</summary>
+    public long GetInt64()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetInt64(Handle, out long v));
+        return v;
+    }
+
+    /// <summary>Gets the document root as a <see cref="ulong"/>. Throws if root is not an unsigned integer.</summary>
+    public ulong GetUInt64()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetUInt64(Handle, out ulong v));
+        return v;
+    }
+
+    /// <summary>Parses the document root as a <see cref="double"/> from a quoted JSON string (e.g. <c>"3.14"</c>).</summary>
+    public double GetDoubleInString()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetDoubleInString(Handle, out double v));
+        return v;
+    }
+
+    /// <summary>Parses the document root as a <see cref="long"/> from a quoted JSON string (e.g. <c>"-42"</c>).</summary>
+    public long GetInt64InString()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetInt64InString(Handle, out long v));
+        return v;
+    }
+
+    /// <summary>Parses the document root as a <see cref="ulong"/> from a quoted JSON string.</summary>
+    public ulong GetUInt64InString()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetUInt64InString(Handle, out ulong v));
+        return v;
+    }
+
+    /// <summary>
+    /// Returns the element at a zero-based <paramref name="index"/> when the document root is an array.
+    /// Throws <see cref="SimdJsonException"/> if the root is not an array or the index is out of bounds.
+    /// </summary>
+    public JsonValue At(int index)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentAt(Handle, (nuint)index, out nint h));
+        return new JsonValue(h, this);
+    }
+
+    /// <summary>
+    /// Returns the number of elements when the document root is an array (requires a full scan).
+    /// </summary>
+    public int CountElements()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentCountElements(Handle, out nuint n));
+        return (int)n;
+    }
+
+    /// <summary>
+    /// Returns the number of fields when the document root is an object (requires a full scan).
+    /// </summary>
+    public int CountFields()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentCountFields(Handle, out nuint n));
+        return (int)n;
+    }
+
     // ── Number helpers ────────────────────────────────────────────────────────
 
     /// <summary>Returns the number type of the document root. Only valid when the root is a number.</summary>

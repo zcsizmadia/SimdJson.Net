@@ -44,6 +44,22 @@ public sealed class JsonValue : IDisposable
     }
 
     /// <summary>
+    /// Gets the value as a <see cref="string"/>, replacing invalid UTF-8 sequences with U+FFFD instead of throwing.
+    /// Throws if the value is not a JSON string.
+    /// </summary>
+    public unsafe string GetString(bool allowReplacement)
+    {
+        if (!allowReplacement)
+        {
+            return GetString();
+        }
+
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetStringAllowReplacement(Handle, out byte* ptr, out nuint len));
+        return Encoding.UTF8.GetString(ptr, (int)len);
+    }
+
+    /// <summary>
     /// Gets the UTF-8 bytes of a JSON string value without allocating a managed string.
     /// The returned span is valid until this document is disposed.
     /// </summary>
@@ -51,6 +67,22 @@ public sealed class JsonValue : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetString(Handle, out byte* ptr, out nuint len));
+        return new ReadOnlySpan<byte>(ptr, (int)len);
+    }
+
+    /// <summary>
+    /// Gets the UTF-8 bytes of a JSON string value without allocating a managed string,
+    /// replacing invalid UTF-8 sequences with U+FFFD bytes instead of throwing.
+    /// </summary>
+    public unsafe ReadOnlySpan<byte> GetStringSpan(bool allowReplacement)
+    {
+        if (!allowReplacement)
+        {
+            return GetStringSpan();
+        }
+
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetStringAllowReplacement(Handle, out byte* ptr, out nuint len));
         return new ReadOnlySpan<byte>(ptr, (int)len);
     }
 
@@ -112,8 +144,21 @@ public sealed class JsonValue : IDisposable
 
     // ── Convenience typed getters ────────────────────────────────────────────
 
-    /// <summary>Gets the value as an <see cref="int"/>. Throws if not an integer.</summary>
-    public int GetInt32() => (int)GetInt64();
+    /// <summary>Gets the value as an <see cref="int"/>. Throws if not an integer, or if the value overflows <see cref="int"/>.</summary>
+    public int GetInt32()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetInt32(Handle, out int v));
+        return v;
+    }
+
+    /// <summary>Gets the value as a <see cref="uint"/>. Throws if not an integer, or if the value overflows <see cref="uint"/>.</summary>
+    public uint GetUInt32()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetUInt32(Handle, out uint v));
+        return v;
+    }
 
     /// <summary>Gets the value as a <see cref="float"/>. Throws if not a number.</summary>
     public float GetFloat() => (float)GetDouble();
@@ -137,13 +182,6 @@ public sealed class JsonValue : IDisposable
         catch (SimdJsonException) { value = default; return false; }
     }
 
-    /// <summary>Tries to get the value as an <see cref="int"/>. Returns <see langword="false"/> if the value is not an integer.</summary>
-    public bool TryGetInt32(out int value)
-    {
-        try { value = GetInt32(); return true; }
-        catch (SimdJsonException) { value = default; return false; }
-    }
-
     /// <summary>Tries to get the value as a <see cref="double"/>. Returns <see langword="false"/> if the value is not a number.</summary>
     public bool TryGetDouble(out double value)
     {
@@ -162,6 +200,20 @@ public sealed class JsonValue : IDisposable
     public bool TryGetBool(out bool value)
     {
         try { value = GetBool(); return true; }
+        catch (SimdJsonException) { value = default; return false; }
+    }
+
+    /// <summary>Tries to get the value as an <see cref="int"/>. Returns <see langword="false"/> if the value is not an integer or overflows.</summary>
+    public bool TryGetInt32(out int value)
+    {
+        try { value = GetInt32(); return true; }
+        catch (SimdJsonException) { value = default; return false; }
+    }
+
+    /// <summary>Tries to get the value as a <see cref="uint"/>. Returns <see langword="false"/> if the value is not an integer or overflows.</summary>
+    public bool TryGetUInt32(out uint value)
+    {
+        try { value = GetUInt32(); return true; }
         catch (SimdJsonException) { value = default; return false; }
     }
 
@@ -547,6 +599,28 @@ public sealed class JsonValue : IDisposable
     }
 
     // ── Wildcard path iteration ───────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the number of elements when this value is an array (requires a full scan).
+    /// Throws if this value is not an array.
+    /// </summary>
+    public int CountElements()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueCountElements(Handle, out nuint n));
+        return (int)n;
+    }
+
+    /// <summary>
+    /// Returns the number of fields when this value is an object (requires a full scan).
+    /// Throws if this value is not an object.
+    /// </summary>
+    public int CountFields()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueCountFields(Handle, out nuint n));
+        return (int)n;
+    }
 
     /// <summary>
     /// Iterates over all values in this value (which must be an array or object) that match

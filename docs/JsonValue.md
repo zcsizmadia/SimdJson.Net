@@ -18,13 +18,16 @@ Represents a JSON value at a specific position in an On-Demand document. Can be 
 | Member | Description |
 |--------|-------------|
 | `GetString()` | As a managed `string` |
+| `GetString(bool allowReplacement)` | As a managed `string`; `allowReplacement: true` replaces lone surrogates with U+FFFD |
 | `GetStringSpan()` | As `ReadOnlySpan<byte>` — zero allocation |
+| `GetStringSpan(bool allowReplacement)` | Zero-allocation span with optional lone-surrogate replacement |
 | `GetDouble()` | As `double` |
 | `GetFloat()` | As `float` |
 | `GetDecimal()` | As `decimal` |
 | `GetInt64()` | As `long` |
 | `GetUInt64()` | As `ulong` |
-| `GetInt32()` | As `int` |
+| `GetInt32()` | As `int` (throws if not int32 or overflows) |
+| `GetUInt32()` | As `uint` (throws if not uint32 or overflows) |
 | `GetBool()` | As `bool` |
 
 ## Container access
@@ -70,6 +73,13 @@ For JSON APIs that encode numbers as quoted strings (e.g. `"price": "9.99"`).
 | `TryGetUInt64InString(out ulong)` | Non-throwing `GetUInt64InString` |
 
 ## Raw JSON & diagnostics
+
+## Counting
+
+| Member | Description |
+|--------|-------------|
+| `CountElements()` | Number of elements when this value is an array (full scan, exhausts iterator) |
+| `CountFields()` | Number of fields when this value is an object (full scan, exhausts iterator) |
 
 ## Wildcard path iteration
 

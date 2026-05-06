@@ -187,6 +187,34 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
         catch (SimdJsonException) { value = null; return false; }
     }
 
+    /// <summary>
+    /// Iterates over all values in this object that match the given JSONPath wildcard expression
+    /// (e.g. <c>"$.*"</c>, <c>"$.items[*].name"</c>) and invokes <paramref name="callback"/> for each match.
+    /// </summary>
+    /// <remarks>
+    /// The <see cref="JsonValue"/> passed to <paramref name="callback"/> is borrowed —
+    /// valid only during the callback, must not be disposed or stored.
+    /// </remarks>
+    public unsafe void ForEachAtPath(string path, Action<JsonValue> callback)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(callback);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(path.Length);
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(path, buf);
+        var gcHandle = System.Runtime.InteropServices.GCHandle.Alloc(callback);
+        try
+        {
+            fixed (byte* p = buf)
+            {
+                SimdJsonException.ThrowIfError(NativeMethods.ObjectForEachAtPath(
+                    Handle, p, (nuint)len, JsonValue.s_wildcardTrampolinePtr,
+                    System.Runtime.InteropServices.GCHandle.ToIntPtr(gcHandle)));
+            }
+        }
+        finally { gcHandle.Free(); }
+    }
+
     /// <summary>Tries to get a value via a JSON Pointer path.</summary>
     public bool TryAtPointer(string pointer, out JsonValue? value)
     {
@@ -210,6 +238,17 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
         ObjectDisposedException.ThrowIf(_disposed, this);
         SimdJsonException.ThrowIfError(NativeMethods.ObjectRawJson(Handle, out byte* ptr, out nuint len));
         return Encoding.UTF8.GetString(ptr, (int)len);
+    }
+
+    /// <summary>
+    /// Returns the full raw JSON of this object as a <see cref="ReadOnlySpan{T}"/> without allocating a string.
+    /// This operation consumes the object iterator; call <see cref="Reset"/> to iterate again.
+    /// </summary>
+    public unsafe ReadOnlySpan<byte> GetRawJsonSpan()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ObjectRawJson(Handle, out byte* ptr, out nuint len));
+        return new ReadOnlySpan<byte>(ptr, (int)len);
     }
 
     /// <summary>Resets the object iterator so the object can be traversed again.</summary>

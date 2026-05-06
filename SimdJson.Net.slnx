@@ -34,5 +34,6 @@
     <Project Path="Samples/09-RealWorld-GeoJson/09-RealWorld-GeoJson.csproj" />
     <Project Path="Samples/10-RealWorld-LogParser/10-RealWorld-LogParser.csproj" />
     <Project Path="Samples/11-WildcardAndRawString/11-WildcardAndRawString.csproj" />
+    <Project Path="Samples/12-DocumentScalarsAndCounting/12-DocumentScalarsAndCounting.csproj" />
   </Folder>
 </Solution>

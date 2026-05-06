@@ -48,6 +48,13 @@ Every element yielded from `foreach` **must be disposed** before the next iterat
 |--------|-------------|
 | `Reset()` | Reset the array iterator to the beginning |
 | `GetRawJson()` | Full raw JSON of the array as a `string` — consumes the iterator; call `Reset()` to re-iterate |
+| `GetRawJsonSpan()` | Full raw JSON as a zero-allocation `ReadOnlySpan<byte>` — also consumes the iterator |
+
+## Wildcard path iteration
+
+| Member | Description |
+|--------|-------------|
+| `ForEachAtPath(string path, Action<JsonValue> callback)` | Invoke `callback` for each value matching a JSONPath wildcard expression (e.g. `"$[*]"`, `"$[*].name"`) starting from this array. The `JsonValue` passed to the callback is **borrowed** — valid only during the callback, must not be disposed or stored. |
 
 ## Examples
 

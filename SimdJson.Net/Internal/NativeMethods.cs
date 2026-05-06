@@ -446,4 +446,94 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueForEachAtPath")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int ValueForEachAtPath(nint value, byte* path, nuint pathLen, nint callback, nint context);
+
+    // ── ForEachAtPath on array and object ─────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ArrayForEachAtPath")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ArrayForEachAtPath(nint array, byte* path, nuint pathLen, nint callback, nint context);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ObjectForEachAtPath")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ObjectForEachAtPath(nint obj, byte* path, nuint pathLen, nint callback, nint context);
+
+    // ── Document scalar getters ───────────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetString")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetString(nint doc, out byte* outPtr, out nuint outLen);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetStringAllowReplacement")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetStringAllowReplacement(nint doc, out byte* outPtr, out nuint outLen);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetBool")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetBool(nint doc, out int outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentIsNull")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentIsNull(nint doc, out int outIsNull);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetDouble")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetDouble(nint doc, out double outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetInt64")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetInt64(nint doc, out long outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetUInt64")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetUInt64(nint doc, out ulong outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetDoubleInString")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetDoubleInString(nint doc, out double outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetInt64InString")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetInt64InString(nint doc, out long outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetUInt64InString")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetUInt64InString(nint doc, out ulong outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentCountElements")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentCountElements(nint doc, out nuint outCount);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentCountFields")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentCountFields(nint doc, out nuint outCount);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentAt")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentAt(nint doc, nuint index, out nint outValue);
+
+    // ── Value count_elements / count_fields ───────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueCountElements")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueCountElements(nint value, out nuint outCount);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueCountFields")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueCountFields(nint value, out nuint outCount);
+
+    // ── Native int32 / uint32 getters ─────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetInt32")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetInt32(nint value, out int outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetUInt32")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetUInt32(nint value, out uint outVal);
+
+    // ── String with allow_replacement ─────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetStringAllowReplacement")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetStringAllowReplacement(nint value, out byte* outPtr, out nuint outLen);
 }

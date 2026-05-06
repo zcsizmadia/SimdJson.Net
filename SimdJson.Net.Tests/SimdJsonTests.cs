@@ -1688,3 +1688,254 @@ public class ForEachAtPathTests
         await Assert.That(results.Count).IsEqualTo(3);
     }
 }
+
+// ─── ForEachAtPath on JsonArray / JsonObject ──────────────────────────────────
+
+public class ForEachAtPathOnContainersTests
+{
+    [Test]
+    public async Task ArrayForEachAtPath_Wildcard()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"items":[1,2,3]}""");
+        using var arr = doc.GetField("items").GetArray();
+        var results = new List<long>();
+        arr.ForEachAtPath("$[*]", v => results.Add(v.GetInt64()));
+        await Assert.That(results).IsEquivalentTo(new long[] { 1, 2, 3 });
+    }
+
+    [Test]
+    public async Task ObjectForEachAtPath_AllFieldValues()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":10,"b":20,"c":30}""");
+        using var obj = doc.GetObject();
+        var results = new List<long>();
+        obj.ForEachAtPath("$.*", v => results.Add(v.GetInt64()));
+        await Assert.That(results.Count).IsEqualTo(3);
+    }
+}
+
+// ─── Document scalar getters ──────────────────────────────────────────────────
+
+public class DocumentScalarGettersTests
+{
+    [Test]
+    public async Task GetString_ScalarRootString()
+    {
+        using var doc = SimdJsonParser.Shared.Parse(""""  "hello"  """");
+        await Assert.That(doc.GetString()).IsEqualTo("hello");
+    }
+
+    [Test]
+    public async Task GetBool_True()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("true");
+        await Assert.That(doc.GetBool()).IsTrue();
+    }
+
+    [Test]
+    public async Task IsNull_NullRoot()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("null");
+        await Assert.That(doc.IsNull()).IsTrue();
+    }
+
+    [Test]
+    public async Task GetDouble_ScalarRoot()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("3.14");
+        await Assert.That(doc.GetDouble()).IsEqualTo(3.14);
+    }
+
+    [Test]
+    public async Task GetInt64_ScalarRoot()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("-42");
+        await Assert.That(doc.GetInt64()).IsEqualTo(-42L);
+    }
+
+    [Test]
+    public async Task GetUInt64_ScalarRoot()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("18446744073709551615");
+        await Assert.That(doc.GetUInt64()).IsEqualTo(ulong.MaxValue);
+    }
+
+    [Test]
+    public async Task GetInt64InString_ScalarRoot()
+    {
+        using var doc = SimdJsonParser.Shared.Parse(""""  "-99"  """");
+        await Assert.That(doc.GetInt64InString()).IsEqualTo(-99L);
+    }
+
+    [Test]
+    public async Task GetDoubleInString_ScalarRoot()
+    {
+        using var doc = SimdJsonParser.Shared.Parse(""""  "2.718"  """");
+        await Assert.That(doc.GetDoubleInString()).IsEqualTo(2.718);
+    }
+
+    [Test]
+    public async Task GetUInt64InString_ScalarRoot()
+    {
+        using var doc = SimdJsonParser.Shared.Parse(""""  "100"  """");
+        await Assert.That(doc.GetUInt64InString()).IsEqualTo(100UL);
+    }
+
+    [Test]
+    public async Task GetString_AllowReplacement_ReturnsString()
+    {
+        using var doc = SimdJsonParser.Shared.Parse(""""  "valid"  """");
+        await Assert.That(doc.GetString(allowReplacement: true)).IsEqualTo("valid");
+    }
+
+    [Test]
+    public async Task At_ReturnsCorrectElement()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("[10,20,30]");
+        using var val = doc.At(1);
+        await Assert.That(val.GetInt64()).IsEqualTo(20L);
+    }
+
+    [Test]
+    public async Task CountElements_RootArray()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("[1,2,3,4,5]");
+        await Assert.That(doc.CountElements()).IsEqualTo(5);
+    }
+
+    [Test]
+    public async Task CountFields_RootObject()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"a":1,"b":2,"c":3}""");
+        await Assert.That(doc.CountFields()).IsEqualTo(3);
+    }
+
+    [Test]
+    public async Task GetRawJsonSpan_MatchesGetRawJson()
+    {
+        const string json = """{"x":1}""";
+        using var doc = SimdJsonParser.Shared.Parse(json);
+        var str = doc.GetRawJson();
+        var span = doc.GetRawJsonSpan();
+        await Assert.That(System.Text.Encoding.UTF8.GetString(span)).IsEqualTo(str);
+    }
+}
+
+// ─── JsonValue count and native int32/uint32 ─────────────────────────────────
+
+public class ValueCountAndNativeIntTests
+{
+    [Test]
+    public async Task CountElements_OnValueArray()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"arr":[1,2,3]}""");
+        using var val = doc.GetField("arr");
+        await Assert.That(val.CountElements()).IsEqualTo(3);
+    }
+
+    [Test]
+    public async Task CountFields_OnValueObject()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"obj":{"a":1,"b":2}}""");
+        using var val = doc.GetField("obj");
+        await Assert.That(val.CountFields()).IsEqualTo(2);
+    }
+
+    [Test]
+    public async Task GetInt32_Native_InRange()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":42}""");
+        using var val = doc.GetField("n");
+        await Assert.That(val.GetInt32()).IsEqualTo(42);
+    }
+
+    [Test]
+    public async Task GetInt32_Native_ThrowsOnOverflow()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":3000000000}""");
+        using var val = doc.GetField("n");
+        await Assert.That(() => val.GetInt32()).Throws<SimdJsonException>();
+    }
+
+    [Test]
+    public async Task GetUInt32_Native_InRange()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":4294967295}""");
+        using var val = doc.GetField("n");
+        await Assert.That(val.GetUInt32()).IsEqualTo(uint.MaxValue);
+    }
+
+    [Test]
+    public async Task GetUInt32_Native_ThrowsOnNegative()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":-1}""");
+        using var val = doc.GetField("n");
+        await Assert.That(() => val.GetUInt32()).Throws<SimdJsonException>();
+    }
+
+    [Test]
+    public async Task TryGetInt32_ReturnsFalseOnOverflow()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":3000000000}""");
+        using var val = doc.GetField("n");
+        await Assert.That(val.TryGetInt32(out _)).IsFalse();
+    }
+
+    [Test]
+    public async Task TryGetUInt32_ReturnsTrueInRange()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"n":99}""");
+        using var val = doc.GetField("n");
+        bool ok = val.TryGetUInt32(out uint result);
+        await Assert.That(ok).IsTrue();
+        await Assert.That(result).IsEqualTo(99u);
+    }
+
+    [Test]
+    public async Task GetString_AllowReplacement_ReturnsString()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"hello"}""");
+        using var val = doc.GetField("s");
+        await Assert.That(val.GetString(allowReplacement: true)).IsEqualTo("hello");
+    }
+
+    [Test]
+    public async Task GetStringSpan_AllowReplacement_MatchesGetString()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"s":"world"}""");
+        using var val = doc.GetField("s");
+        var span = val.GetStringSpan(allowReplacement: true);
+        await Assert.That(System.Text.Encoding.UTF8.GetString(span)).IsEqualTo("world");
+    }
+}
+
+// ─── GetRawJsonSpan on array and object ──────────────────────────────────────
+
+public class RawJsonSpanTests
+{
+    [Test]
+    public async Task ArrayGetRawJsonSpan_MatchesGetRawJson()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"arr":[1,2,3]}""");
+        using var arr = doc.GetField("arr").GetArray();
+        var str = arr.GetRawJson();
+        // Re-open to get span (GetRawJson consumes)
+        using var doc2 = SimdJsonParser.Shared.Parse("""{"arr":[1,2,3]}""");
+        using var arr2 = doc2.GetField("arr").GetArray();
+        var span = arr2.GetRawJsonSpan();
+        await Assert.That(System.Text.Encoding.UTF8.GetString(span)).IsEqualTo(str);
+    }
+
+    [Test]
+    public async Task ObjectGetRawJsonSpan_MatchesGetRawJson()
+    {
+        const string json = """{"a":1,"b":2}""";
+        using var doc = SimdJsonParser.Shared.Parse(json);
+        using var obj = doc.GetObject();
+        var str = obj.GetRawJson();
+        using var doc2 = SimdJsonParser.Shared.Parse(json);
+        using var obj2 = doc2.GetObject();
+        var span = obj2.GetRawJsonSpan();
+        await Assert.That(System.Text.Encoding.UTF8.GetString(span)).IsEqualTo(str);
+    }
+}
