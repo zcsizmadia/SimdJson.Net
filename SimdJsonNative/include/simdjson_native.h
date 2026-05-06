@@ -49,6 +49,8 @@ typedef int32_t SimdJsonError;
 #define SIMDJSON_BRIDGE_ERR_NULL_POINTER      -5
 #define SIMDJSON_BRIDGE_ERR_PARSE_ERROR       -6
 #define SIMDJSON_BRIDGE_ERR_ITERATION_ERROR   -7
+#define SIMDJSON_BRIDGE_ERR_INVALID_POINTER   -8   // INVALID_JSON_POINTER
+#define SIMDJSON_BRIDGE_ERR_SCALAR_DOCUMENT   -9   // SCALAR_DOCUMENT_AS_VALUE
 #define SIMDJSON_BRIDGE_ERR_UNKNOWN           -99
 
 // ─── JSON value types ────────────────────────────────────────────────────────
@@ -61,6 +63,14 @@ typedef enum SimdJsonType {
     SIMDJSON_TYPE_NULL    = 5,
     SIMDJSON_TYPE_UNKNOWN = 6
 } SimdJsonType;
+
+// ─── JSON number sub-types ───────────────────────────────────────────────────
+typedef enum SimdJsonNumberType {
+    SIMDJSON_NUMBER_TYPE_FLOATING_POINT   = 0,   // double
+    SIMDJSON_NUMBER_TYPE_SIGNED_INTEGER   = 1,   // int64
+    SIMDJSON_NUMBER_TYPE_UNSIGNED_INTEGER = 2,   // uint64 (>= 2^63)
+    SIMDJSON_NUMBER_TYPE_BIG_INTEGER      = 3    // integer outside 64-bit range
+} SimdJsonNumberType;
 
 // ─── Library info ────────────────────────────────────────────────────────────
 
@@ -222,6 +232,135 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectGetFieldByKey(
 SJNATIVE_API void SJNATIVE_CALL SimdJsonNative_DestroyValue(SimdJsonValue value);
 SJNATIVE_API void SJNATIVE_CALL SimdJsonNative_DestroyArray(SimdJsonArray array);
 SJNATIVE_API void SJNATIVE_CALL SimdJsonNative_DestroyObject(SimdJsonObject object);
+
+// ─── Number type inspection ──────────────────────────────────────────────────
+
+/** Returns the sub-type of a number value (float / signed / unsigned / big). */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetNumberType(
+    SimdJsonValue value, SimdJsonNumberType* out_type);
+
+/** Returns 1 if the number value is negative, 0 otherwise. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueIsNegative(
+    SimdJsonValue value, int32_t* out_val);
+
+/** Returns 1 if the number value is an integer (no fractional part), 0 otherwise. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueIsInteger(
+    SimdJsonValue value, int32_t* out_val);
+
+// ─── Raw JSON access ─────────────────────────────────────────────────────────
+
+/**
+ * Returns the raw JSON token for a scalar value (quotes included for strings).
+ * For arrays/objects returns only the opening '[' or '{'.
+ * The pointer is valid for the lifetime of the owning document.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueRawJsonToken(
+    SimdJsonValue value, const char** out_ptr, size_t* out_len);
+
+/**
+ * Returns the full raw JSON for a value (traverses arrays/objects).
+ * The pointer is valid for the lifetime of the owning document.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueRawJson(
+    SimdJsonValue value, const char** out_ptr, size_t* out_len);
+
+/** Returns the full raw JSON for an array (consumes the iterator). */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayRawJson(
+    SimdJsonArray array, const char** out_ptr, size_t* out_len);
+
+/** Returns the full raw JSON for an object (consumes the iterator). */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectRawJson(
+    SimdJsonObject object, const char** out_ptr, size_t* out_len);
+
+/** Returns the full raw JSON for the document root. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentRawJson(
+    SimdJsonDocument doc, const char** out_ptr, size_t* out_len);
+
+// ─── Numbers encoded as strings ──────────────────────────────────────────────
+
+/** Parses a number from a quoted JSON string value into a double. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetDoubleInString(
+    SimdJsonValue value, double* out_val);
+
+/** Parses a number from a quoted JSON string value into an int64. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetInt64InString(
+    SimdJsonValue value, int64_t* out_val);
+
+/** Parses a number from a quoted JSON string value into a uint64. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetUInt64InString(
+    SimdJsonValue value, uint64_t* out_val);
+
+// ─── JSON Pointer and JSONPath ───────────────────────────────────────────────
+
+/** Gets a value via a JSONPath expression on the document root. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentAtPath(
+    SimdJsonDocument doc, const char* json_path, SimdJsonValue* out_value);
+
+/** Gets a value via a JSON Pointer path starting from a value. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueAtPointer(
+    SimdJsonValue value, const char* json_pointer, SimdJsonValue* out_value);
+
+/** Gets a value via a JSONPath expression starting from a value. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueAtPath(
+    SimdJsonValue value, const char* json_path, SimdJsonValue* out_value);
+
+/** Gets a value via a JSON Pointer path starting from an object. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectAtPointer(
+    SimdJsonObject object, const char* json_pointer, SimdJsonValue* out_value);
+
+/** Gets a value via a JSONPath expression starting from an object. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectAtPath(
+    SimdJsonObject object, const char* json_path, SimdJsonValue* out_value);
+
+// ─── Order-sensitive field lookup ────────────────────────────────────────────
+
+/**
+ * Searches forward from the current iterator position for a field with
+ * the given key (does not rewind). Faster than the unordered variant when
+ * fields are accessed in declaration order.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentFindField(
+    SimdJsonDocument doc, const char* key, SimdJsonValue* out_value);
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueFindField(
+    SimdJsonValue value, const char* key, SimdJsonValue* out_value);
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectFindField(
+    SimdJsonObject object, const char* key, SimdJsonValue* out_value);
+
+// ─── Document rewind ─────────────────────────────────────────────────────────
+
+/** Rewinds the document iterator to the start. Allows re-reading the document. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentRewind(SimdJsonDocument doc);
+
+// ─── Array and Object index/reset ────────────────────────────────────────────
+
+/** Returns the element at a zero-based index without iterating from the start. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayAt(
+    SimdJsonArray array, size_t index, SimdJsonValue* out_value);
+
+/** Resets the array iterator so it can be traversed again. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayReset(SimdJsonArray array);
+
+/** Resets the object iterator so it can be traversed again. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectReset(SimdJsonObject object);
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
+/**
+ * Minifies JSON by removing all unnecessary whitespace.
+ * dst must point to a buffer of at least src_len bytes.
+ * On success, *out_new_len receives the number of bytes written.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_Minify(
+    const char* src, size_t src_len, char* dst, size_t* out_new_len);
+
+/**
+ * Returns 1 if the bytes constitute valid UTF-8, 0 otherwise.
+ * Does not parse JSON; pure UTF-8 validation.
+ */
+SJNATIVE_API int32_t SJNATIVE_CALL SimdJsonNative_ValidateUtf8(
+    const char* src, size_t src_len);
 
 #ifdef __cplusplus
 } // extern "C"

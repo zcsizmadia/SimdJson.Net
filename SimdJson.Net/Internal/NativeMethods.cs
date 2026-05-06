@@ -160,4 +160,120 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DestroyObject")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void DestroyObject(nint obj);
+
+    // ── Number type inspection ────────────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetNumberType")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetNumberType(nint value, out JsonNumberType outType);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueIsNegative")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueIsNegative(nint value, out int outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueIsInteger")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueIsInteger(nint value, out int outVal);
+
+    // ── Raw JSON access ───────────────────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueRawJsonToken")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueRawJsonToken(nint value, out byte* outPtr, out nuint outLen);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueRawJson")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueRawJson(nint value, out byte* outPtr, out nuint outLen);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ArrayRawJson")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ArrayRawJson(nint array, out byte* outPtr, out nuint outLen);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ObjectRawJson")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ObjectRawJson(nint obj, out byte* outPtr, out nuint outLen);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentRawJson")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentRawJson(nint doc, out byte* outPtr, out nuint outLen);
+
+    // ── Numbers encoded as strings ────────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetDoubleInString")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetDoubleInString(nint value, out double outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetInt64InString")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetInt64InString(nint value, out long outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetUInt64InString")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetUInt64InString(nint value, out ulong outVal);
+
+    // ── JSON Pointer and JSONPath ──────────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentAtPath")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentAtPath(nint doc, byte* jsonPath, out nint outValue);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueAtPointer")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueAtPointer(nint value, byte* jsonPointer, out nint outValue);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueAtPath")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueAtPath(nint value, byte* jsonPath, out nint outValue);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ObjectAtPointer")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ObjectAtPointer(nint obj, byte* jsonPointer, out nint outValue);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ObjectAtPath")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ObjectAtPath(nint obj, byte* jsonPath, out nint outValue);
+
+    // ── Order-sensitive field lookup ──────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentFindField")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentFindField(nint doc, byte* key, out nint outValue);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueFindField")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueFindField(nint value, byte* key, out nint outValue);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ObjectFindField")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ObjectFindField(nint obj, byte* key, out nint outValue);
+
+    // ── Document rewind ───────────────────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentRewind")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentRewind(nint doc);
+
+    // ── Array and Object index/reset ──────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ArrayAt")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ArrayAt(nint array, nuint index, out nint outValue);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ArrayReset")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ArrayReset(nint array);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ObjectReset")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ObjectReset(nint obj);
+
+    // ── Utilities ─────────────────────────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_Minify")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int Minify(byte* src, nuint srcLen, byte* dst, out nuint outNewLen);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValidateUtf8")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValidateUtf8(byte* src, nuint srcLen);
 }

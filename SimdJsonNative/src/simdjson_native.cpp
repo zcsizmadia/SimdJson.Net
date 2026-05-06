@@ -30,6 +30,8 @@ static SimdJsonError translate_error(simdjson::error_code ec) noexcept {
         case UNCLOSED_STRING:
         case NUMBER_ERROR:               return SIMDJSON_BRIDGE_ERR_PARSE_ERROR;
         case OUT_OF_ORDER_ITERATION:     return SIMDJSON_BRIDGE_ERR_ITERATION_ERROR;
+        case INVALID_JSON_POINTER:       return SIMDJSON_BRIDGE_ERR_INVALID_POINTER;
+        case SCALAR_DOCUMENT_AS_VALUE:   return SIMDJSON_BRIDGE_ERR_SCALAR_DOCUMENT;
         default:                         return SIMDJSON_BRIDGE_ERR_UNKNOWN;
     }
 }
@@ -516,4 +518,365 @@ extern "C" void SJNATIVE_CALL SimdJsonNative_DestroyArray(SimdJsonArray array) {
 
 extern "C" void SJNATIVE_CALL SimdJsonNative_DestroyObject(SimdJsonObject object) {
     delete static_cast<BridgeObject*>(object);
+}
+
+// ─── Number type inspection ──────────────────────────────────────────────────
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetNumberType(
+    SimdJsonValue value, SimdJsonNumberType* out_type)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_type);
+    auto* bv = static_cast<BridgeValue*>(value);
+    simdjson::ondemand::number_type nt;
+    auto err = bv->value.get_number_type().get(nt);
+    if (err) return translate_error(err);
+    switch (nt) {
+        case simdjson::ondemand::number_type::floating_point_number:
+            *out_type = SIMDJSON_NUMBER_TYPE_FLOATING_POINT; break;
+        case simdjson::ondemand::number_type::signed_integer:
+            *out_type = SIMDJSON_NUMBER_TYPE_SIGNED_INTEGER; break;
+        case simdjson::ondemand::number_type::unsigned_integer:
+            *out_type = SIMDJSON_NUMBER_TYPE_UNSIGNED_INTEGER; break;
+        case simdjson::ondemand::number_type::big_integer:
+            *out_type = SIMDJSON_NUMBER_TYPE_BIG_INTEGER; break;
+        default:
+            *out_type = SIMDJSON_NUMBER_TYPE_FLOATING_POINT; break;
+    }
+    return SIMDJSON_BRIDGE_SUCCESS;
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueIsNegative(
+    SimdJsonValue value, int32_t* out_val)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_val);
+    auto* bv = static_cast<BridgeValue*>(value);
+    // is_negative() returns bool directly (no error_code)
+    *out_val = bv->value.is_negative() ? 1 : 0;
+    return SIMDJSON_BRIDGE_SUCCESS;
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueIsInteger(
+    SimdJsonValue value, int32_t* out_val)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_val);
+    auto* bv = static_cast<BridgeValue*>(value);
+    bool is_int;
+    auto err = bv->value.is_integer().get(is_int);
+    if (err) return translate_error(err);
+    *out_val = is_int ? 1 : 0;
+    return SIMDJSON_BRIDGE_SUCCESS;
+}
+
+// ─── Raw JSON access ─────────────────────────────────────────────────────────
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueRawJsonToken(
+    SimdJsonValue value, const char** out_ptr, size_t* out_len)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_ptr);
+    CHECK_NULL(out_len);
+    auto* bv = static_cast<BridgeValue*>(value);
+    // raw_json_token() returns string_view directly (no error_code)
+    auto sv = bv->value.raw_json_token();
+    *out_ptr = sv.data();
+    *out_len = sv.size();
+    return SIMDJSON_BRIDGE_SUCCESS;
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueRawJson(
+    SimdJsonValue value, const char** out_ptr, size_t* out_len)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_ptr);
+    CHECK_NULL(out_len);
+    auto* bv = static_cast<BridgeValue*>(value);
+    std::string_view sv;
+    auto err = bv->value.raw_json().get(sv);
+    if (err) return translate_error(err);
+    *out_ptr = sv.data();
+    *out_len = sv.size();
+    return SIMDJSON_BRIDGE_SUCCESS;
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayRawJson(
+    SimdJsonArray array, const char** out_ptr, size_t* out_len)
+{
+    CHECK_NULL(array);
+    CHECK_NULL(out_ptr);
+    CHECK_NULL(out_len);
+    auto* ba = static_cast<BridgeArray*>(array);
+    std::string_view sv;
+    auto err = ba->array.raw_json().get(sv);
+    if (err) return translate_error(err);
+    *out_ptr = sv.data();
+    *out_len = sv.size();
+    return SIMDJSON_BRIDGE_SUCCESS;
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectRawJson(
+    SimdJsonObject object, const char** out_ptr, size_t* out_len)
+{
+    CHECK_NULL(object);
+    CHECK_NULL(out_ptr);
+    CHECK_NULL(out_len);
+    auto* bo = static_cast<BridgeObject*>(object);
+    std::string_view sv;
+    auto err = bo->object.raw_json().get(sv);
+    if (err) return translate_error(err);
+    *out_ptr = sv.data();
+    *out_len = sv.size();
+    return SIMDJSON_BRIDGE_SUCCESS;
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentRawJson(
+    SimdJsonDocument doc, const char** out_ptr, size_t* out_len)
+{
+    CHECK_NULL(doc);
+    CHECK_NULL(out_ptr);
+    CHECK_NULL(out_len);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    std::string_view sv;
+    auto err = bd->doc.raw_json().get(sv);
+    if (err) return translate_error(err);
+    *out_ptr = sv.data();
+    *out_len = sv.size();
+    return SIMDJSON_BRIDGE_SUCCESS;
+}
+
+// ─── Numbers encoded as strings ──────────────────────────────────────────────
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetDoubleInString(
+    SimdJsonValue value, double* out_val)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_val);
+    auto* bv = static_cast<BridgeValue*>(value);
+    auto err = bv->value.get_double_in_string().get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetInt64InString(
+    SimdJsonValue value, int64_t* out_val)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_val);
+    auto* bv = static_cast<BridgeValue*>(value);
+    auto err = bv->value.get_int64_in_string().get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetUInt64InString(
+    SimdJsonValue value, uint64_t* out_val)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_val);
+    auto* bv = static_cast<BridgeValue*>(value);
+    auto err = bv->value.get_uint64_in_string().get(*out_val);
+    return translate_error(err);
+}
+
+// ─── JSON Pointer and JSONPath ───────────────────────────────────────────────
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentAtPath(
+    SimdJsonDocument doc, const char* json_path, SimdJsonValue* out_value)
+{
+    CHECK_NULL(doc);
+    CHECK_NULL(json_path);
+    CHECK_NULL(out_value);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    try {
+        auto* bv = new BridgeValue();
+        simdjson::error_code ec;
+        bd->doc.at_path(json_path).tie(bv->value, ec);
+        if (ec) { delete bv; return translate_error(ec); }
+        *out_value = bv;
+        return SIMDJSON_BRIDGE_SUCCESS;
+    } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueAtPointer(
+    SimdJsonValue value, const char* json_pointer, SimdJsonValue* out_value)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(json_pointer);
+    CHECK_NULL(out_value);
+    auto* bv = static_cast<BridgeValue*>(value);
+    try {
+        auto* child = new BridgeValue();
+        simdjson::error_code ec;
+        bv->value.at_pointer(json_pointer).tie(child->value, ec);
+        if (ec) { delete child; return translate_error(ec); }
+        *out_value = child;
+        return SIMDJSON_BRIDGE_SUCCESS;
+    } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueAtPath(
+    SimdJsonValue value, const char* json_path, SimdJsonValue* out_value)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(json_path);
+    CHECK_NULL(out_value);
+    auto* bv = static_cast<BridgeValue*>(value);
+    try {
+        auto* child = new BridgeValue();
+        simdjson::error_code ec;
+        bv->value.at_path(json_path).tie(child->value, ec);
+        if (ec) { delete child; return translate_error(ec); }
+        *out_value = child;
+        return SIMDJSON_BRIDGE_SUCCESS;
+    } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectAtPointer(
+    SimdJsonObject object, const char* json_pointer, SimdJsonValue* out_value)
+{
+    CHECK_NULL(object);
+    CHECK_NULL(json_pointer);
+    CHECK_NULL(out_value);
+    auto* bo = static_cast<BridgeObject*>(object);
+    try {
+        auto* bv = new BridgeValue();
+        simdjson::error_code ec;
+        bo->object.at_pointer(json_pointer).tie(bv->value, ec);
+        if (ec) { delete bv; return translate_error(ec); }
+        *out_value = bv;
+        return SIMDJSON_BRIDGE_SUCCESS;
+    } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectAtPath(
+    SimdJsonObject object, const char* json_path, SimdJsonValue* out_value)
+{
+    CHECK_NULL(object);
+    CHECK_NULL(json_path);
+    CHECK_NULL(out_value);
+    auto* bo = static_cast<BridgeObject*>(object);
+    try {
+        auto* bv = new BridgeValue();
+        simdjson::error_code ec;
+        bo->object.at_path(json_path).tie(bv->value, ec);
+        if (ec) { delete bv; return translate_error(ec); }
+        *out_value = bv;
+        return SIMDJSON_BRIDGE_SUCCESS;
+    } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
+}
+
+// ─── Order-sensitive field lookup ────────────────────────────────────────────
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentFindField(
+    SimdJsonDocument doc, const char* key, SimdJsonValue* out_value)
+{
+    CHECK_NULL(doc);
+    CHECK_NULL(key);
+    CHECK_NULL(out_value);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    try {
+        auto* bv = new BridgeValue();
+        simdjson::error_code ec;
+        bd->doc.find_field(key).tie(bv->value, ec);
+        if (ec) { delete bv; return translate_error(ec); }
+        *out_value = bv;
+        return SIMDJSON_BRIDGE_SUCCESS;
+    } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueFindField(
+    SimdJsonValue value, const char* key, SimdJsonValue* out_value)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(key);
+    CHECK_NULL(out_value);
+    auto* bv = static_cast<BridgeValue*>(value);
+    try {
+        auto* child = new BridgeValue();
+        simdjson::error_code ec;
+        bv->value.find_field(key).tie(child->value, ec);
+        if (ec) { delete child; return translate_error(ec); }
+        *out_value = child;
+        return SIMDJSON_BRIDGE_SUCCESS;
+    } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectFindField(
+    SimdJsonObject object, const char* key, SimdJsonValue* out_value)
+{
+    CHECK_NULL(object);
+    CHECK_NULL(key);
+    CHECK_NULL(out_value);
+    auto* bo = static_cast<BridgeObject*>(object);
+    try {
+        auto* bv = new BridgeValue();
+        simdjson::error_code ec;
+        bo->object.find_field(key).tie(bv->value, ec);
+        if (ec) { delete bv; return translate_error(ec); }
+        *out_value = bv;
+        return SIMDJSON_BRIDGE_SUCCESS;
+    } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
+}
+
+// ─── Document rewind ─────────────────────────────────────────────────────────
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentRewind(SimdJsonDocument doc)
+{
+    CHECK_NULL(doc);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    bd->doc.rewind();
+    return SIMDJSON_BRIDGE_SUCCESS;
+}
+
+// ─── Array and Object index/reset ────────────────────────────────────────────
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayAt(
+    SimdJsonArray array, size_t index, SimdJsonValue* out_value)
+{
+    CHECK_NULL(array);
+    CHECK_NULL(out_value);
+    auto* ba = static_cast<BridgeArray*>(array);
+    try {
+        auto* bv = new BridgeValue();
+        simdjson::error_code ec;
+        ba->array.at(index).tie(bv->value, ec);
+        if (ec) { delete bv; return translate_error(ec); }
+        *out_value = bv;
+        return SIMDJSON_BRIDGE_SUCCESS;
+    } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayReset(SimdJsonArray array)
+{
+    CHECK_NULL(array);
+    auto* ba = static_cast<BridgeArray*>(array);
+    if (auto err = ba->array.reset().error()) return translate_error(err);
+    return SIMDJSON_BRIDGE_SUCCESS;
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectReset(SimdJsonObject object)
+{
+    CHECK_NULL(object);
+    auto* bo = static_cast<BridgeObject*>(object);
+    if (auto err = bo->object.reset().error()) return translate_error(err);
+    return SIMDJSON_BRIDGE_SUCCESS;
+}
+
+// ─── Utilities ───────────────────────────────────────────────────────────────
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_Minify(
+    const char* src, size_t src_len, char* dst, size_t* out_new_len)
+{
+    CHECK_NULL(src);
+    CHECK_NULL(dst);
+    CHECK_NULL(out_new_len);
+    auto err = simdjson::minify(src, src_len, dst, *out_new_len);
+    return translate_error(err);
+}
+
+extern "C" int32_t SJNATIVE_CALL SimdJsonNative_ValidateUtf8(
+    const char* src, size_t src_len)
+{
+    if (!src) return 0;
+    return simdjson::validate_utf8(src, src_len) ? 1 : 0;
 }

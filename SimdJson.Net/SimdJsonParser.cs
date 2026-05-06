@@ -120,4 +120,85 @@ public sealed class SimdJsonParser : IDisposable
         NativeMethods.DestroyParser(_handle);
         _handle = 0;
     }
+
+    // ── Static utilities (no parser instance required) ────────────────────────
+
+    /// <summary>
+    /// Minifies a JSON string by removing all insignificant whitespace.
+    /// </summary>
+    /// <param name="json">The UTF-16 JSON string to minify.</param>
+    /// <returns>The minified JSON string.</returns>
+    public static unsafe string Minify(string json)
+    {
+        ArgumentNullException.ThrowIfNull(json);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(json.Length);
+        byte[] inputBuf = System.Buffers.ArrayPool<byte>.Shared.Rent(maxBytes);
+        byte[] outputBuf = System.Buffers.ArrayPool<byte>.Shared.Rent(maxBytes);
+        try
+        {
+            int inputLen = Encoding.UTF8.GetBytes(json, inputBuf);
+            nuint outLen;
+            fixed (byte* pIn = inputBuf, pOut = outputBuf)
+            {
+                SimdJsonException.ThrowIfError(
+                    NativeMethods.Minify(pIn, (nuint)inputLen, pOut, out outLen));
+            }
+            return Encoding.UTF8.GetString(outputBuf, 0, (int)outLen);
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(inputBuf);
+            System.Buffers.ArrayPool<byte>.Shared.Return(outputBuf);
+        }
+    }
+
+    /// <summary>
+    /// Minifies a UTF-8 JSON byte span by removing all insignificant whitespace.
+    /// </summary>
+    /// <param name="utf8Json">The UTF-8 encoded JSON to minify.</param>
+    /// <returns>A new byte array containing the minified UTF-8 JSON.</returns>
+    public static unsafe byte[] MinifyUtf8(ReadOnlySpan<byte> utf8Json)
+    {
+        if (utf8Json.IsEmpty) return [];
+        byte[] outputBuf = System.Buffers.ArrayPool<byte>.Shared.Rent(utf8Json.Length);
+        try
+        {
+            nuint outLen;
+            fixed (byte* pIn = utf8Json, pOut = outputBuf)
+            {
+                SimdJsonException.ThrowIfError(
+                    NativeMethods.Minify(pIn, (nuint)utf8Json.Length, pOut, out outLen));
+            }
+            return outputBuf[..(int)outLen];
+        }
+        finally
+        {
+            System.Buffers.ArrayPool<byte>.Shared.Return(outputBuf);
+        }
+    }
+
+    /// <summary>
+    /// Returns <see langword="true"/> if the given bytes constitute valid UTF-8.
+    /// This performs pure UTF-8 validation without parsing JSON.
+    /// </summary>
+    public static unsafe bool ValidateUtf8(ReadOnlySpan<byte> bytes)
+    {
+        if (bytes.IsEmpty) return true;
+        fixed (byte* p = bytes)
+        {
+            return NativeMethods.ValidateUtf8(p, (nuint)bytes.Length) != 0;
+        }
+    }
+
+    /// <summary>
+    /// Returns <see langword="true"/> if the given string, when encoded to UTF-8, produces valid UTF-8.
+    /// Since .NET strings are UTF-16, this encodes to UTF-8 first and then validates.
+    /// </summary>
+    public static bool ValidateUtf8(string text)
+    {
+        ArgumentNullException.ThrowIfNull(text);
+        // All valid .NET strings produce valid UTF-8 when transcoded.
+        // This is primarily useful for byte buffers, but provided for completeness.
+        return ValidateUtf8(Encoding.UTF8.GetBytes(text));
+    }
 }

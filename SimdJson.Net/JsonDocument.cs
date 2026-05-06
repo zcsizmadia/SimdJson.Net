@@ -95,6 +95,66 @@ public sealed class JsonDocument : IDisposable
         catch (SimdJsonException) { value = null; return false; }
     }
 
+    /// <summary>Gets a value via a JSONPath expression (e.g. <c>"$.items[0].name"</c>).</summary>
+    public unsafe JsonValue AtPath(string jsonPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(jsonPath.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(jsonPath, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(NativeMethods.DocumentAtPath(Handle, p, out var h));
+            return new JsonValue(h, this);
+        }
+    }
+
+    /// <summary>Tries to get a value via a JSONPath expression.</summary>
+    public bool TryAtPath(string jsonPath, out JsonValue? value)
+    {
+        try { value = AtPath(jsonPath); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
+    /// <summary>
+    /// Searches forward from the current iterator position for a field with the given key
+    /// (order-sensitive, does not rewind). Faster than <see cref="GetField"/> when fields
+    /// are accessed in document order.
+    /// </summary>
+    public unsafe JsonValue FindField(string key)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(key.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(key, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(NativeMethods.DocumentFindField(Handle, p, out var h));
+            return new JsonValue(h, this);
+        }
+    }
+
+    /// <summary>
+    /// Rewinds the document iterator to the start, allowing the document to be re-read.
+    /// Note: existing <see cref="JsonValue"/>, <see cref="JsonArray"/>, and
+    /// <see cref="JsonObject"/> handles obtained before rewind become invalid.
+    /// </summary>
+    public void Rewind()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentRewind(Handle));
+    }
+
+    /// <summary>Returns the full raw JSON of the document root as a string.</summary>
+    public unsafe string GetRawJson()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentRawJson(Handle, out byte* ptr, out nuint len));
+        return Encoding.UTF8.GetString(ptr, (int)len);
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

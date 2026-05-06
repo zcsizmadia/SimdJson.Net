@@ -200,6 +200,204 @@ public sealed class JsonValue : IDisposable
     /// <inheritdoc cref="GetField(string)"/>
     public JsonValue this[string key] => GetField(key);
 
+    // ── Number type inspection ────────────────────────────────────────────────
+
+    /// <summary>
+    /// Gets the sub-type of a JSON number value (float / signed / unsigned / big integer).
+    /// Throws if this value is not a number.
+    /// </summary>
+    public JsonNumberType GetNumberType()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetNumberType(Handle, out var t));
+        return t;
+    }
+
+    /// <summary>
+    /// Returns <see langword="true"/> if this number value is negative.
+    /// Throws if this value is not a number.
+    /// </summary>
+    public bool IsNegative()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueIsNegative(Handle, out int v));
+        return v != 0;
+    }
+
+    /// <summary>
+    /// Returns <see langword="true"/> if this number value has no fractional part.
+    /// Throws if this value is not a number.
+    /// </summary>
+    public bool IsInteger()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueIsInteger(Handle, out int v));
+        return v != 0;
+    }
+
+    // ── Raw JSON access ───────────────────────────────────────────────────────
+
+    /// <summary>
+    /// Returns the raw JSON token for a scalar value (quotes included for strings).
+    /// For an array or object, returns only the opening bracket character.
+    /// The returned string is decoded from the bytes that live in the document buffer.
+    /// </summary>
+    public unsafe string GetRawJsonToken()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueRawJsonToken(Handle, out byte* ptr, out nuint len));
+        return Encoding.UTF8.GetString(ptr, (int)len);
+    }
+
+    /// <summary>
+    /// Returns a <see cref="ReadOnlySpan{T}"/> over the raw JSON token bytes without allocation.
+    /// Valid only while this document is alive.
+    /// </summary>
+    public unsafe ReadOnlySpan<byte> GetRawJsonTokenSpan()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueRawJsonToken(Handle, out byte* ptr, out nuint len));
+        return new ReadOnlySpan<byte>(ptr, (int)len);
+    }
+
+    /// <summary>
+    /// Returns the full raw JSON of this value — traverses arrays and objects to find the end.
+    /// Useful for extracting a JSON sub-document as a string.
+    /// </summary>
+    public unsafe string GetRawJson()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueRawJson(Handle, out byte* ptr, out nuint len));
+        return Encoding.UTF8.GetString(ptr, (int)len);
+    }
+
+    // ── Numbers encoded as strings ────────────────────────────────────────────
+
+    /// <summary>
+    /// Parses a <see cref="double"/> from a JSON string value like <c>"3.14"</c>.
+    /// Throws if the value is not a string or the content is not a valid number.
+    /// </summary>
+    public double GetDoubleInString()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetDoubleInString(Handle, out double v));
+        return v;
+    }
+
+    /// <summary>
+    /// Parses an <see cref="long"/> from a JSON string value like <c>"-42"</c>.
+    /// Throws if the value is not a string or the content is not a valid integer.
+    /// </summary>
+    public long GetInt64InString()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetInt64InString(Handle, out long v));
+        return v;
+    }
+
+    /// <summary>
+    /// Parses a <see cref="ulong"/> from a JSON string value like <c>"18446744073709551615"</c>.
+    /// Throws if the value is not a string or the content is not a valid unsigned integer.
+    /// </summary>
+    public ulong GetUInt64InString()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetUInt64InString(Handle, out ulong v));
+        return v;
+    }
+
+    /// <summary>Tries to parse a <see cref="double"/> from a JSON string value.</summary>
+    public bool TryGetDoubleInString(out double value)
+    {
+        try { value = GetDoubleInString(); return true; }
+        catch (SimdJsonException) { value = default; return false; }
+    }
+
+    /// <summary>Tries to parse an <see cref="long"/> from a JSON string value.</summary>
+    public bool TryGetInt64InString(out long value)
+    {
+        try { value = GetInt64InString(); return true; }
+        catch (SimdJsonException) { value = default; return false; }
+    }
+
+    /// <summary>Tries to parse a <see cref="ulong"/> from a JSON string value.</summary>
+    public bool TryGetUInt64InString(out ulong value)
+    {
+        try { value = GetUInt64InString(); return true; }
+        catch (SimdJsonException) { value = default; return false; }
+    }
+
+    // ── JSON Pointer and JSONPath ──────────────────────────────────────────────
+
+    /// <summary>
+    /// Gets a descendant value via a JSON Pointer path (e.g. <c>"/items/0/name"</c>),
+    /// starting from this value.
+    /// </summary>
+    public unsafe JsonValue AtPointer(string pointer)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(pointer.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(pointer, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(NativeMethods.ValueAtPointer(Handle, p, out var h));
+            return new JsonValue(h, _owner);
+        }
+    }
+
+    /// <summary>
+    /// Gets a descendant value via a JSONPath expression (e.g. <c>"$.items[0].name"</c>),
+    /// starting from this value.
+    /// </summary>
+    public unsafe JsonValue AtPath(string jsonPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(jsonPath.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(jsonPath, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(NativeMethods.ValueAtPath(Handle, p, out var h));
+            return new JsonValue(h, _owner);
+        }
+    }
+
+    /// <summary>
+    /// Searches forward from the current iterator position for a field with the given key
+    /// (order-sensitive, does not rewind). Faster than <see cref="GetField"/> when fields
+    /// are accessed in document order.
+    /// </summary>
+    public unsafe JsonValue FindField(string key)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(key.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(key, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(NativeMethods.ValueFindField(Handle, p, out var h));
+            return new JsonValue(h, _owner);
+        }
+    }
+
+    /// <summary>Tries to get a descendant value via a JSON Pointer path.</summary>
+    public bool TryAtPointer(string pointer, out JsonValue? value)
+    {
+        try { value = AtPointer(pointer); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
+    /// <summary>Tries to get a descendant value via a JSONPath expression.</summary>
+    public bool TryAtPath(string jsonPath, out JsonValue? value)
+    {
+        try { value = AtPath(jsonPath); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

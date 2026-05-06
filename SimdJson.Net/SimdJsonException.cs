@@ -35,6 +35,8 @@ public sealed class SimdJsonException : Exception
         -5  => "Null pointer passed to native bridge.",
         -6  => "JSON parse error.",
         -7  => "Iteration error.",
+        -8  => "Invalid JSON pointer.",
+        -9  => "Scalar document cannot be used as a value.",
         -99 => "Unknown native error.",
         _   => $"Native error {code}."
     };

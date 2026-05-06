@@ -85,6 +85,37 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
         }
     }
 
+    /// <summary>
+    /// Returns the element at a zero-based <paramref name="index"/> using the native
+    /// <c>array.at()</c> method. Faster than <see cref="ElementAt"/> for random access.
+    /// Throws <see cref="SimdJsonException"/> if the index is out of bounds.
+    /// </summary>
+    public JsonValue At(int index)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ArrayAt(Handle, (nuint)index, out nint h));
+        return new JsonValue(h, _owner);
+    }
+
+    /// <summary>
+    /// Returns the full raw JSON of this array as a string.
+    /// This operation consumes the array iterator; call <see cref="Reset"/> to iterate again.
+    /// </summary>
+    public unsafe string GetRawJson()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ArrayRawJson(Handle, out byte* ptr, out nuint len));
+        return System.Text.Encoding.UTF8.GetString(ptr, (int)len);
+    }
+
+    /// <summary>Resets the array iterator so the array can be traversed again.</summary>
+    public void Reset()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ArrayReset(Handle));
+    }
+
     public void Dispose()
     {
         if (_disposed) return;

@@ -102,6 +102,86 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 
+    /// <summary>Gets a value via a JSON Pointer path (e.g. <c>"/address/city"</c>).</summary>
+    public unsafe JsonValue AtPointer(string pointer)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(pointer.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(pointer, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(NativeMethods.ObjectAtPointer(Handle, p, out var h));
+            return new JsonValue(h, _owner);
+        }
+    }
+
+    /// <summary>Gets a value via a JSONPath expression (e.g. <c>"$.address.city"</c>).</summary>
+    public unsafe JsonValue AtPath(string jsonPath)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(jsonPath.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(jsonPath, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(NativeMethods.ObjectAtPath(Handle, p, out var h));
+            return new JsonValue(h, _owner);
+        }
+    }
+
+    /// <summary>
+    /// Searches forward from the current position for a field with the given key
+    /// (order-sensitive). Faster than <see cref="GetField"/> when accessing fields in order.
+    /// </summary>
+    public unsafe JsonValue FindField(string key)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(key.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(key, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(NativeMethods.ObjectFindField(Handle, p, out var h));
+            return new JsonValue(h, _owner);
+        }
+    }
+
+    /// <summary>Tries to get a value via a JSON Pointer path.</summary>
+    public bool TryAtPointer(string pointer, out JsonValue? value)
+    {
+        try { value = AtPointer(pointer); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
+    /// <summary>Tries to get a value via a JSONPath expression.</summary>
+    public bool TryAtPath(string jsonPath, out JsonValue? value)
+    {
+        try { value = AtPath(jsonPath); return true; }
+        catch (SimdJsonException) { value = null; return false; }
+    }
+
+    /// <summary>
+    /// Returns the full raw JSON of this object as a string.
+    /// This operation consumes the object iterator; call <see cref="Reset"/> to iterate again.
+    /// </summary>
+    public unsafe string GetRawJson()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ObjectRawJson(Handle, out byte* ptr, out nuint len));
+        return Encoding.UTF8.GetString(ptr, (int)len);
+    }
+
+    /// <summary>Resets the object iterator so the object can be traversed again.</summary>
+    public void Reset()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.ObjectReset(Handle));
+    }
+
     public void Dispose()
     {
         if (_disposed) return;
