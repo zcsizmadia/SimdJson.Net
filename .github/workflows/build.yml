@@ -55,7 +55,7 @@ jobs:
         if: matrix.runtimeId == 'linux-musl-arm64'
         uses: laverdet/alpine-arm64@v1
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Install packages needed for building the native libraries.
       - name: Install packages
@@ -127,7 +127,7 @@ jobs:
     runs-on: ubuntu-latest
     if: always() && needs.build-simdjson.result == 'success'
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Install .NET SDKs
         uses: actions/setup-dotnet@v5
@@ -171,7 +171,7 @@ jobs:
         if: matrix.runtimeId == 'linux-musl-arm64'
         uses: laverdet/alpine-arm64@v1
 
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       # Install packages needed for running .NET on Alpine.
       - name: Install packages
