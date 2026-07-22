@@ -70,7 +70,7 @@ jobs:
       # which is used to ensure the vcpkg version matches and to determine
       # the expected library file names.
       - name: Install .NET SDKs
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
             8.0.x
@@ -130,7 +130,7 @@ jobs:
       - uses: actions/checkout@v7
 
       - name: Install .NET SDKs
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
             10.0.x
@@ -182,7 +182,7 @@ jobs:
           fi
 
       - name: Install .NET SDKs
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
             10.0.x
