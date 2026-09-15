@@ -83,6 +83,8 @@ JsonNumber n = val.GetNumber();
 SimdJsonParser.GetVersion();           // "4.6.11"
 SimdJsonParser.Minify(json);
 SimdJsonParser.ValidateUtf8(bytes);
+
+parser.Allocate(capacity: 4 * 1024 * 1024, maxDepth: 64);
 ```
 
 ### Raw JSON string
@@ -131,6 +133,11 @@ bool    n = doc.IsNull();
 double  d = doc.GetDouble();
 long    i = doc.GetInt64();
 ulong   u = doc.GetUInt64();
+int     i32 = doc.GetInt32();
+uint    u32 = doc.GetUInt32();
+
+// Trailing content after a root array or object
+bool clean = doc.AtEnd();   // check after fully consuming the root
 
 // Numbers stored as JSON strings
 long   i = doc.GetInt64InString();

@@ -273,6 +273,45 @@ public sealed class JsonDocument : IDisposable
         return v;
     }
 
+    /// <summary>
+    /// Gets the document root as an <see cref="int"/>.
+    /// Throws if the root is not an integer, or if the value does not fit in an <see cref="int"/>.
+    /// </summary>
+    public int GetInt32()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetInt32(Handle, out int v));
+        return v;
+    }
+
+    /// <summary>
+    /// Gets the document root as a <see cref="uint"/>.
+    /// Throws if the root is not an integer, or if the value does not fit in a <see cref="uint"/>.
+    /// </summary>
+    public uint GetUInt32()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetUInt32(Handle, out uint v));
+        return v;
+    }
+
+    /// <summary>
+    /// Returns <see langword="true"/> if the document has been fully consumed and nothing
+    /// follows the root value.
+    /// </summary>
+    /// <remarks>
+    /// Only meaningful after the root value has been read. simdjson validates the root container
+    /// itself but does not otherwise report content after it, so input such as
+    /// <c>[1,2] trailing</c> iterates cleanly; this is the check that catches it. Scalar roots
+    /// report trailing content as <see cref="SimdJsonException"/> with code <c>-13</c> instead.
+    /// </remarks>
+    public bool AtEnd()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentAtEnd(Handle, out int v));
+        return v != 0;
+    }
+
     /// <summary>Parses the document root as a <see cref="double"/> from a quoted JSON string (e.g. <c>"3.14"</c>).</summary>
     public double GetDoubleInString()
     {

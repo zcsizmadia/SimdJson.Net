@@ -120,6 +120,7 @@ public sealed class SimdJsonParser : IDisposable
     }
 
     /// <summary>Returns the maximum JSON nesting depth this parser supports.</summary>
+    /// <remarks>Change it with <see cref="Allocate"/>.</remarks>
     public nuint MaxDepth
     {
         get
@@ -128,6 +129,28 @@ public sealed class SimdJsonParser : IDisposable
             SimdJsonException.ThrowIfError(NativeMethods.ParserMaxDepth(_handle, out nuint v));
             return v;
         }
+    }
+
+    /// <summary>
+    /// Pre-allocates this parser's buffers for documents up to <paramref name="capacity"/> bytes
+    /// with at most <paramref name="maxDepth"/> levels of nesting.
+    /// </summary>
+    /// <param name="capacity">Document size in bytes to allocate for.</param>
+    /// <param name="maxDepth">Maximum nesting depth. The simdjson default is 1024.</param>
+    /// <remarks>
+    /// Calling this up front avoids the reallocation that the first large parse would otherwise
+    /// trigger. It also sets <see cref="MaxDepth"/>, which simdjson consults when iterating
+    /// JSONPath wildcards: beyond the limit those report <see cref="SimdJsonException"/> with code
+    /// <c>-12</c> rather than recursing. Depth is not otherwise enforced during ordinary parsing in
+    /// release builds of the native library, so do not rely on it alone to bound untrusted input;
+    /// use <paramref name="capacity"/> and <see cref="MaxCapacity"/> for that.
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException"><paramref name="maxDepth"/> is zero.</exception>
+    public void Allocate(nuint capacity, nuint maxDepth = 1024)
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentOutOfRangeException.ThrowIfZero(maxDepth);
+        SimdJsonException.ThrowIfError(NativeMethods.ParserAllocate(_handle, capacity, maxDepth));
     }
 
     /// <summary>
