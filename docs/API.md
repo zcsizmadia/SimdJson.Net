@@ -11,7 +11,8 @@ Complete reference for the `SimdJson.Net` public API.
 | [JsonValue](JsonValue.md) | A single JSON value — scalar, array, or object |
 | [JsonArray](JsonArray.md) | A JSON array with iteration and index access |
 | [JsonObject](JsonObject.md) | A JSON object with field lookup and iteration |
-| [NdjsonParser](NdjsonParser.md) | Sequential and parallel NDJSON (newline-delimited JSON) parser |
+| [NdjsonParser](NdjsonParser.md) | NDJSON (newline-delimited JSON): streaming, parallel, and in-memory batching |
+| [JsonDocumentStream](NdjsonParser.md#jsondocumentstream) | Forward-only stream of documents from one in-memory buffer |
 | [Numbers](Numbers.md) | `JsonNumberType` enum and `JsonNumber` struct |
 | [Types & Errors](Types.md) | `JsonValueKind`, `JsonProperty`, `SimdJsonException` error codes |
 
@@ -223,6 +224,23 @@ var opts = new NdjsonParserOptions
     SkipEmptyLines         = true,
     LeaveOpen              = false, // dispose stream when done
 };
+```
+
+```csharp
+// In-memory batching parser (simdjson iterate_many) — faster, needs the whole input resident
+byte[] ndjson = File.ReadAllBytes("events.ndjson");
+List<long> ids = NdjsonParser.Parse(ndjson, doc =>
+{
+    using var v = doc.GetField("id");
+    return v.GetInt64();
+});
+
+// Manual iteration, with per-document offset and raw text
+using var stream = NdjsonParser.OpenStream(ndjson);
+while (stream.MoveNext())
+{
+    Console.WriteLine(stream.CurrentIndex);
+}
 ```
 
 See [NdjsonParser](NdjsonParser.md) for the full reference.

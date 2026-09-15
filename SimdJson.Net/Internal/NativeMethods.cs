@@ -67,6 +67,37 @@ internal static unsafe partial class NativeMethods
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int ParseInPlace(
         nint parser, byte* json, nuint length, nuint capacity, out nint outDoc);
+    // ── Document streams ──────────────────────────────────────────────────
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ParseMany")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ParseMany(
+        nint parser, byte* json, nuint length, nuint batchSize,
+        int allowCommaSeparated, out nint outStream);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_StreamNext")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int StreamNext(nint stream, out nint outDoc, out int outDone);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_StreamCurrentIndex")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int StreamCurrentIndex(nint stream, out nuint outIndex);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_StreamSource")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int StreamSource(nint stream, out byte* outPtr, out nuint outLen);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_StreamTruncatedBytes")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int StreamTruncatedBytes(nint stream, out nuint outTruncated);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_StreamSizeInBytes")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int StreamSizeInBytes(nint stream, out nuint outSize);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DestroyStream")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial void DestroyStream(nint stream);
 
     // ── Document root access ──────────────────────────────────────────────
 

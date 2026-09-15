@@ -35,6 +35,7 @@ typedef void* SimdJsonArray;     // ondemand::array   iterator
 typedef void* SimdJsonObject;    // ondemand::object  iterator
 typedef void* SimdJsonArrayIter; // iterator over an array
 typedef void* SimdJsonObjectIter;// iterator over an object
+typedef void* SimdJsonStream;    // ondemand::document_stream over NDJSON input
 
 // ─── Error codes ────────────────────────────────────────────────────────────
 // Bridge-specific codes derived from simdjson::error_code.
@@ -167,6 +168,68 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseInPlace(
     size_t         length,
     size_t         capacity,
     SimdJsonDocument* out_doc);
+// ─── Document streams (NDJSON / concatenated JSON) ───────────────────────────
+
+/**
+ * Opens a stream over newline-delimited or concatenated JSON.
+ *
+ * Unlike SimdJsonNative_Parse, stage 1 runs over whole batches rather than one document
+ * at a time, and where simdjson was built with threads it overlaps the next batch's
+ * stage 1 with the current batch's parsing. The whole input must be resident: batch_size
+ * bounds the working set of the index, not of the input itself.
+ *
+ * @param batch_size            Bytes of input indexed at a time. 0 selects simdjson's default.
+ *                              Must exceed the largest single document in the input.
+ * @param allow_comma_separated Non-zero to also accept documents separated by commas,
+ *                              which permits streaming a top-level JSON array.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseMany(
+    SimdJsonParser parser,
+    const char*    json,
+    size_t         length,
+    size_t         batch_size,
+    int32_t        allow_comma_separated,
+    SimdJsonStream* out_stream);
+
+/**
+ * Advances to the next document.
+ *
+ * On success *out_doc receives a document handle that BORROWS the stream's current
+ * document. It is invalidated by the next call to StreamNext and must not outlive the
+ * stream. Destroying it with SimdJsonNative_DestroyDocument frees only the wrapper.
+ *
+ * When the stream is exhausted *out_done is set to 1 and *out_doc to NULL.
+ *
+ * A document that fails to parse returns its error with *out_done 0 and *out_doc NULL;
+ * calling StreamNext again skips it and continues with the following document.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_StreamNext(
+    SimdJsonStream stream, SimdJsonDocument* out_doc, int32_t* out_done);
+
+/** Byte offset of the current document within the input. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_StreamCurrentIndex(
+    SimdJsonStream stream, size_t* out_index);
+
+/** Raw JSON text of the current document, pointing into the stream's buffer. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_StreamSource(
+    SimdJsonStream stream, const char** out_ptr, size_t* out_len);
+
+/**
+ * Bytes left unparsed at the end of the input, usually an incomplete trailing document.
+ *
+ * Only meaningful once the stream has been iterated to the end with no document
+ * reporting an error. Outside those conditions simdjson documents the value as
+ * arbitrary: it can exceed the input size or wrap around.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_StreamTruncatedBytes(
+    SimdJsonStream stream, size_t* out_truncated);
+
+/** Total size of the stream's input in bytes. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_StreamSizeInBytes(
+    SimdJsonStream stream, size_t* out_size);
+
+/** Destroys a stream. Every document handle from it becomes invalid. */
+SJNATIVE_API void SJNATIVE_CALL SimdJsonNative_DestroyStream(SimdJsonStream stream);
 
 /** Destroys a document returned by SimdJsonNative_Parse. */
 SJNATIVE_API void SJNATIVE_CALL SimdJsonNative_DestroyDocument(SimdJsonDocument doc);
