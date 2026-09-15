@@ -40,7 +40,11 @@ Disposing a parser disposes its live document, and every `JsonValue`, `JsonArray
 
 ## Span lifetime
 
-`GetStringSpan()`, `GetWobblyStringSpan()`, `GetRawJsonSpan()`, and `GetRawJsonTokenSpan()` return pointers into buffers owned by the **parser**, not by the document. They stay valid only until the owning parser parses again or is disposed. Copy the bytes (or call the `string`-returning overload) if you need the data to outlive the document.
+`GetStringSpan()`, `GetWobblyStringSpan()`, `GetRawJsonSpan()`, `GetRawJsonTokenSpan()` and `JsonProperty.EscapedNameSpan` all return pointers into native memory rather than managed arrays.
+
+**The rule to follow: a span is valid until the owning `JsonDocument` is disposed.** Copy the bytes, or call the `string`-returning overload, if you need the data to outlive the document.
+
+The detail behind that rule, if you are debugging: the raw-JSON and escaped-key spans point into the document's own input buffer, while the unescaped string spans point into the parser's string buffer, which the next parse overwrites. Since a parser now refuses to parse again while a document is alive, the document's lifetime is the shorter of the two and is the only bound you need to reason about.
 
 ```csharp
 // BAD — span is dangling after the parser is reused

@@ -2,7 +2,7 @@
 
 A high-performance .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v4.6.11, exposing the On-Demand API via a thin C ABI bridge.
 
-- **`SimdJson.Net`** — idiomatic C# API: `SimdJsonParser`, `JsonDocument`, `JsonValue`, `JsonArray`, `JsonObject`
+- **`SimdJson.Net`** — idiomatic C# API: `SimdJsonParser`, `JsonDocument`, `JsonValue`, `JsonArray`, `JsonObject`, plus `NdjsonParser` and `JsonDocumentStream` for newline-delimited JSON
 
 All native binaries are compiled from source via GitHub Actions — transparent, reproducible, and auditable.
 
@@ -14,9 +14,20 @@ using var doc = SimdJsonParser.Shared.Parse("""{"name":"Alice","age":30}""");
 using var name = doc.GetField("name");
 Console.WriteLine(name.GetString()); // Alice
 
-// Parse from UTF-8 span (zero-copy)
+// Parse from UTF-8 span (no transcoding; the bytes are copied into the document)
 ReadOnlySpan<byte> utf8 = """{"x":1}"""u8;
 using var doc2 = SimdJsonParser.Shared.Parse(utf8);
+
+// Truly zero-copy: parse out of your own buffer, which must have
+// SimdJsonParser.RequiredPadding bytes of slack after the JSON
+using var doc3 = parser.ParseInPlace(paddedBuffer, jsonLength);
+
+// NDJSON from memory, using simdjson's batching parser
+List<long> ids = NdjsonParser.Parse(File.ReadAllBytes("events.ndjson"),
+    d => { using var v = d.GetField("id"); return v.GetInt64(); });
+
+// Which SIMD kernel simdjson selected for this machine
+Console.WriteLine(SimdJsonParser.ActiveImplementation); // e.g. "haswell"
 
 // Async parse from stream
 using var doc3 = await parser.ParseAsync(stream, cancellationToken);
@@ -65,6 +76,7 @@ Full API reference and design notes live in the [`docs/`](docs/) folder:
 | [docs/JsonArray.md](docs/JsonArray.md) | Array — iteration, index access, `Count`, `IsEmpty` |
 | [docs/JsonObject.md](docs/JsonObject.md) | Object — `GetField`, `FindField`, `ContainsKey`, iteration |
 | [docs/Numbers.md](docs/Numbers.md) | `JsonNumberType`, `JsonNumber` struct |
+| [docs/NdjsonParser.md](docs/NdjsonParser.md) | NDJSON — streaming, parallel, and in-memory `iterate_many` batching |
 | [docs/Types.md](docs/Types.md) | `JsonValueKind`, `JsonProperty`, `SimdJsonException` error codes |
 | [docs/DesignNotes.md](docs/DesignNotes.md) | Thread safety, forward-only iteration, dispose rules, pitfalls |
 
@@ -85,6 +97,8 @@ The `Samples/` folder contains runnable console projects, each demonstrating a d
 | [09-RealWorld-GeoJson](Samples/09-RealWorld-GeoJson/Program.cs) | GeoJSON FeatureCollection — nested objects/arrays, bounding-box calculation, On-Demand forward-iteration discipline |
 | [10-RealWorld-LogParser](Samples/10-RealWorld-LogParser/Program.cs) | NDJSON log stream — parser reuse across lines, aggregation, `TryGetField` for optional fields |
 | [11-WildcardAndRawString](Samples/11-WildcardAndRawString/Program.cs) | `ForEachAtPath` wildcard JSONPath iteration; `GetRawJsonString`/`GetRawJsonStringSpan` for escaped-byte access |
+| [12-DocumentScalarsAndCounting](Samples/12-DocumentScalarsAndCounting/Program.cs) | Root scalar getters, `At(index)`, `CountElements`/`CountFields`, number-in-string getters |
+| [13-NdjsonParsing](Samples/13-NdjsonParsing/Program.cs) | `NdjsonParser.ParseAsync`/`ParseParallelAsync`/`ForEachAsync` over a stream, `NdjsonParserOptions`, CRLF and BOM edge cases |
 
 > **On-Demand iteration tip**: simdjson On-Demand is a forward-only streaming parser. Always fully consume a nested object or array before accessing the next sibling field in its parent. See samples 09 and 10 for patterns.
 

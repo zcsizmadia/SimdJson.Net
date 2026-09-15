@@ -26,8 +26,13 @@ simdjson (C++, FetchContent) ──► SimdJsonNative.dll  (C ABI bridge, CMake)
 | `SimdJson.Net/Internal/NativeMethods.cs` | `[LibraryImport]` P/Invoke declarations |
 | `SimdJson.Net/Internal/NativeLoader.cs` | Runtime DLL resolution (runtimes/ layout + flat) |
 | `SimdJson.Net/*.cs` | Public C# types (`SimdJsonParser`, `JsonDocument`, `JsonValue`, `JsonArray`, `JsonObject`, …) |
-| `SimdJson.Net.Tests/SimdJsonTests.cs` | TUnit tests (510 tests across net8/net9/net10) |
-| `Samples/0N-Name/Program.cs` | 10 standalone demo apps |
+| `SimdJson.Net/NdjsonParser.cs` | NDJSON: stream-based reading plus the in-memory `iterate_many` batching API |
+| `SimdJson.Net/JsonDocumentStream.cs` | Forward-only stream of documents from one in-memory buffer |
+| `SimdJson.Net.Benchmark/` | BenchmarkDotNet suites: parse, field access, full traversal, NDJSON |
+| `NupkgValidator/` | Consumes the freshly built package and loads the native library on each RID |
+| `.github/workflows/release.yml` | Publishes to NuGet.org and GitHub Packages when a release is published |
+| `SimdJson.Net.Tests/*.cs` | TUnit tests, one file per topic (428 per target framework, 1,284 across net8/net9/net10) |
+| `Samples/0N-Name/Program.cs` | 13 standalone demo apps |
 | `docs/` | Per-type API reference; `docs/API.md` is the index |
 | `.github/workflows/build.yml` | CI: builds native libs for 8 RIDs, then runs .NET tests |
 
@@ -64,13 +69,32 @@ Then `dotnet build` and `dotnet test` as usual.
 ### C++ structs in the bridge
 
 ```cpp
-struct BridgeDocument { padded_string json_buf; ondemand::document doc; };
+struct BridgeDocument {
+    padded_string json_buf;      // owned input copy; empty when the document is borrowed
+    ondemand::document owned;    // storage when this handle owns the document
+    ondemand::document* doc;     // the live document: &owned, or one inside a stream
+    bool from_stream;            // true for documents handed out by StreamNext
+};
+struct BridgeStream {            // NDJSON batching: iterate_many
+    padded_string json_buf;
+    ondemand::document_stream stream;
+    ondemand::document_stream::iterator current, end;
+    bool started;
+};
 struct BridgeValue    { ondemand::value value;  };
 struct BridgeArray    { ondemand::array array;  };
 struct BridgeObject   { ondemand::object object; };
 ```
 
 `BridgeArrayIterator` and `BridgeObjectIterator` hold iterator + end state for sequential `foreach` iteration.
+
+Two consequences of the `BridgeDocument` shape worth knowing:
+
+- Always go through `bd->doc`, never `bd->owned`, except when assigning the result of `iterate`.
+- Root scalar getters must use the `DOC_SCALAR` macro. Stream documents are read through
+  `document_reference`, whose getters skip the trailing-content check, because the bytes after a
+  stream document are simply the next document. Calling `bd->doc->get_int64()` directly on a stream
+  document reports `-13` for every document but the last.
 
 ### NativeLoader
 
@@ -94,7 +118,7 @@ Searches for `SimdJsonNative.{dll,so,dylib}` in:
 | One live `JsonDocument` per `SimdJsonParser` instance at a time | `InvalidOperationException` on the second `Parse` |
 | Dispose `JsonValue`/`JsonArray`/`JsonObject` handles promptly | Native handle leak |
 | Do not use a `JsonValue`/`JsonArray`/`JsonObject` after its document is disposed | `ObjectDisposedException` |
-| Spans from `GetStringSpan`/`GetRawJson*Span` live in the **parser's** buffers | Dangling data after the next `Parse` on that parser |
+| Spans returned by any `*Span` getter are valid only until the owning `JsonDocument` is disposed | Dangling data |
 
 C++ exceptions must never cross the `extern "C"` boundary: never rely on `simdjson_result`'s implicit
 conversion operator in the bridge (it throws). Always take the value with `.get(out)` and translate the
@@ -143,7 +167,7 @@ using var tmp = SimdJsonParser.Shared.Parse("-7");  // separate parser, doc stil
 ### Step 1 — C++ implementation (`simdjson_native.cpp`)
 
 ```cpp
-SIMDJSONNATIVE_API int __cdecl SimdJsonNative_ValueMyNewMethod(
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueMyNewMethod(
     void* value_handle, /* output params */ out_type* out)
 {
     if (!value_handle || !out) return SIMDJSON_BRIDGE_ERR_NULL_POINTER;
@@ -158,7 +182,7 @@ SIMDJSONNATIVE_API int __cdecl SimdJsonNative_ValueMyNewMethod(
 ### Step 2 — Header (`simdjson_native.h`)
 
 ```c
-SIMDJSONNATIVE_API int __cdecl SimdJsonNative_ValueMyNewMethod(void* value, out_type* out);
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueMyNewMethod(void* value, out_type* out);
 ```
 
 ### Step 3 — P/Invoke (`NativeMethods.cs`)
@@ -179,7 +203,7 @@ public ReturnType MyNewMethod()
 }
 ```
 
-### Step 5 — Test (`SimdJsonTests.cs`)
+### Step 5 — Test (the matching file in `SimdJson.Net.Tests/`)
 
 ```csharp
 [Test]
@@ -226,13 +250,14 @@ Run on a specific TFM: `dotnet test SimdJson.Net.Tests -f net10.0`
 | `-4` | `INDEX_OUT_OF_BOUNDS` | Array index past end |
 | `-5` | *(bridge)* | Null pointer passed |
 | `-6` | `TAPE_ERROR` / parse errors | Malformed JSON |
-| `-7` | `OUT_OF_ORDER_ITERATION` | Forward-only constraint violated |
+| `-7` | `OUT_OF_ORDER_ITERATION` / `PARSER_IN_USE` | Forward-only constraint violated |
 | `-8` | `INVALID_JSON_POINTER` | Bad RFC 6901 pointer syntax |
 | `-9` | `SCALAR_DOCUMENT_AS_VALUE` | Scalar doc used as container |
 | `-10` | `NUMBER_OUT_OF_RANGE` / `BIGINT_ERROR` | Number does not fit the requested type |
 | `-11` | `MEMALLOC` / `OUT_OF_CAPACITY` | Native allocation failed |
 | `-12` | `DEPTH_ERROR` | Nesting deeper than the parser's max depth |
 | `-13` | `TRAILING_CONTENT` | Extra content after the JSON value |
+| `-14` | `INSUFFICIENT_PADDING` | Buffer lacks the padding `ParseInPlace` requires |
 | `-99` | *(unknown)* | Unrecognised simdjson error |
 
 When adding a bridge function, make sure any new simdjson `error_code` it can return is handled in

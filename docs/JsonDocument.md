@@ -45,6 +45,8 @@ Scalar roots are different: simdjson reports trailing content there itself, as `
 |--------|-------------|
 | `GetField(string)` / `this[string]` | Field by name — order-insensitive |
 | `FindField(string)` | Order-sensitive forward-search field lookup |
+| `FindFieldUnordered(string)` | Order-insensitive lookup; may rewind |
+| `TryFindFieldUnordered(string, out JsonValue?)` | Non-throwing `FindFieldUnordered` |
 | `AtPointer(string)` | RFC 6901 JSON Pointer (e.g. `"/items/0/name"`) |
 | `AtPath(string)` | JSONPath expression (e.g. `"$.items[0].name"`) |
 | `TryGetField(string, out JsonValue?)` | Non-throwing `GetField` |
@@ -91,6 +93,19 @@ Use when the JSON document root is a bare scalar value (e.g. `"hello"`, `42`, `t
 | `GetInt64InString()` | Parse a `long` out of a root JSON string (e.g. `"-99"`) |
 | `GetUInt64InString()` | Parse a `ulong` out of a root JSON string (e.g. `"100"`) |
 | `At(int index)` | Element at 0-based `index` when root is an array — returns a `JsonValue` that must be disposed |
+
+## Root number inspection and raw token
+
+Available when the document root is a number. See [Numbers.md](Numbers.md) for `JsonNumber`.
+
+| Member | Description |
+|--------|-------------|
+| `GetNumberType()` | `JsonNumberType` of the root number |
+| `GetNumber()` | Type and value in one call, as a `JsonNumber` |
+| `IsNegative()` | `true` if the root number is negative |
+| `IsInteger()` | `true` if the root number has no fractional part |
+| `GetRawJsonToken()` | Raw token text of the root as a `string` |
+| `GetRawJsonTokenSpan()` | Raw token as a `ReadOnlySpan<byte>` — zero allocation |
 
 ## Counting
 

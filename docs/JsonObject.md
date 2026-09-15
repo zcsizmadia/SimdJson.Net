@@ -9,6 +9,7 @@ Represents a JSON object obtained from a parsed document. Wraps a forward-only O
 | Member | Description |
 |--------|-------------|
 | `Count` | Number of fields — performs a full scan |
+| `IsEmpty()` | `true` if the object has no fields, without the full scan `Count` needs |
 
 ## Field lookup
 
@@ -18,6 +19,7 @@ Represents a JSON object obtained from a parsed document. Wraps a forward-only O
 | `FindField(string)` | Order-sensitive; searches forward from the current iterator position — use when accessing fields in declaration order |
 | `FindFieldUnordered(string)` | Alias for `GetField` (order-insensitive) |
 | `TryGetField(string, out JsonValue?)` | Non-throwing `GetField` |
+| `TryFindFieldUnordered(string, out JsonValue?)` | Non-throwing `FindFieldUnordered` |
 | `ContainsKey(string)` | Returns `true` if the key exists (does not return a value) |
 
 All field lookup methods return a [`JsonValue`](JsonValue.md) that **must be disposed**.
