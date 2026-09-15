@@ -268,6 +268,27 @@ diagnostic output, not API.
 
 ---
 
+## Bumping the simdjson version
+
+`<SimdJsonVersion>` in `Directory.Build.props` is the single source of truth for the build: CMake
+reads it to pick the git tag, and the package version derives from it. Several places repeat the
+number for humans and do **not** update themselves. After changing it, update all of these:
+
+| Location | What to change |
+|----------|----------------|
+| `Directory.Build.props` | `<SimdJsonVersion>` — the only one that affects the build |
+| `README.md` | the simdjson badge, its release link, the intro line, and the `GetVersion()` comment |
+| `AGENTS.md`, `.github/copilot-instructions.md` | the version in the project-overview line |
+| `docs/API.md`, `docs/SimdJsonParser.md` | the `GetVersion()` example output |
+| `SimdJson.Net/SimdJsonParser.cs` | the XML doc example on `GetVersion` |
+
+`grep -rn "<old version>" --include=*.md --include=*.props --include=*.cs .` finds the lot.
+
+Read the upstream release notes between the old and new versions before bumping. Several past
+releases changed behaviour this wrapper depends on, and the pull request should say which.
+
+---
+
 ## CI / build pipeline
 
 `.github/workflows/build.yml`:
