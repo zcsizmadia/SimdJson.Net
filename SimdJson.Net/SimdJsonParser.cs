@@ -23,6 +23,9 @@ namespace SimdJson;
 public sealed class SimdJsonParser : IDisposable
 {
     private nint _handle;
+
+    /// <summary>The native parser handle, for bridge calls made on this parser's behalf.</summary>
+    internal nint Handle => _handle;
     private bool _disposed;
     private JsonDocument? _liveDocument;
 

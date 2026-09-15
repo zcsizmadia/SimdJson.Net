@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Runtime.CompilerServices;
 using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
+using SimdJson.Internal;
 
 namespace SimdJson;
 
@@ -56,6 +57,25 @@ public sealed class NdjsonParserOptions
     /// Defaults to <see langword="false"/> (stream is disposed when parsing ends).
     /// </summary>
     public bool LeaveOpen { get; init; } = false;
+
+    /// <summary>
+    /// Bytes of input simdjson indexes at a time in the in-memory batching overloads.
+    /// <c>0</c> (default) selects simdjson's own default, currently 1 MB.
+    /// </summary>
+    /// <remarks>
+    /// This bounds the index, not the input, which must be resident in full for those overloads.
+    /// It must be larger than the biggest single document in the input, or that document cannot
+    /// be parsed. Used only by <see cref="NdjsonParser.Parse{T}(ReadOnlySpan{byte}, Func{JsonDocument, T}, NdjsonParserOptions?)"/>
+    /// and <see cref="NdjsonParser.OpenStream(ReadOnlySpan{byte}, NdjsonParserOptions?)"/>.
+    /// </remarks>
+    public int BatchSize { get; init; } = 0;
+
+    /// <summary>
+    /// When <see langword="true"/>, documents separated by commas are accepted as well as by
+    /// newlines, which allows a top-level JSON array to be read as a stream of its elements.
+    /// Defaults to <see langword="false"/>. Used only by the in-memory batching overloads.
+    /// </summary>
+    public bool AllowCommaSeparated { get; init; } = false;
 }
 
 /// <summary>
@@ -90,6 +110,105 @@ public sealed class NdjsonParserOptions
 /// </remarks>
 public static class NdjsonParser
 {
+    // ── In-memory batching API (simdjson iterate_many) ────────────────────────
+
+    /// <summary>
+    /// Opens a <see cref="JsonDocumentStream"/> over an in-memory NDJSON or concatenated-JSON
+    /// buffer, using simdjson's batching parser.
+    /// </summary>
+    /// <remarks>
+    /// Prefer this over the <see cref="Stream"/> overloads when the input already fits in memory:
+    /// simdjson indexes whole batches rather than one document at a time, and overlaps the next
+    /// batch's indexing with the current batch's parsing where the native library has threads.
+    /// The trade is that the entire input must be resident; the stream overloads read
+    /// incrementally and remain the right choice for inputs larger than memory.
+    /// </remarks>
+    public static unsafe JsonDocumentStream OpenStream(
+        ReadOnlySpan<byte> utf8Ndjson,
+        NdjsonParserOptions? options = null)
+    {
+        options ??= NdjsonParserOptions.Default;
+        ArgumentOutOfRangeException.ThrowIfNegative(options.BatchSize);
+
+        // The stream owns a padded copy of the input, so the caller's span need not outlive
+        // this call. The parser handle is owned by the stream for its lifetime.
+        var parser = new SimdJsonParser();
+        try
+        {
+            nint streamHandle;
+            int err;
+            if (utf8Ndjson.IsEmpty)
+            {
+                byte empty = 0;
+                err = NativeMethods.ParseMany(parser.Handle, &empty, 0, (nuint)options.BatchSize,
+                    options.AllowCommaSeparated ? 1 : 0, out streamHandle);
+            }
+            else
+            {
+                fixed (byte* p = utf8Ndjson)
+                {
+                    err = NativeMethods.ParseMany(parser.Handle, p, (nuint)utf8Ndjson.Length,
+                        (nuint)options.BatchSize, options.AllowCommaSeparated ? 1 : 0,
+                        out streamHandle);
+                }
+            }
+
+            SimdJsonException.ThrowIfError(err);
+            return new JsonDocumentStream(streamHandle, parser);
+        }
+        catch
+        {
+            parser.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>
+    /// Parses an in-memory NDJSON buffer with simdjson's batching parser, projecting each
+    /// document through <paramref name="selector"/>. Results are returned in document order.
+    /// </summary>
+    /// <param name="utf8Ndjson">UTF-8 encoded NDJSON or concatenated JSON.</param>
+    /// <param name="selector">
+    /// Called once per document. The <see cref="JsonDocument"/> is invalidated as soon as the
+    /// delegate returns, so do not store it.
+    /// </param>
+    /// <param name="options">
+    /// Parser options. <see cref="NdjsonParserOptions.SkipMalformedLines"/> and
+    /// <see cref="NdjsonParserOptions.BatchSize"/> apply; the threading and stream options do not.
+    /// </param>
+    public static List<T> Parse<T>(
+        ReadOnlySpan<byte> utf8Ndjson,
+        Func<JsonDocument, T> selector,
+        NdjsonParserOptions? options = null)
+    {
+        ArgumentNullException.ThrowIfNull(selector);
+        options ??= NdjsonParserOptions.Default;
+
+        var results = new List<T>();
+        using var stream = OpenStream(utf8Ndjson, options);
+        while (true)
+        {
+            // Both the advance and the projection are guarded, because On-Demand reports most
+            // malformed input lazily: the stream hands back a document and the error only
+            // surfaces when the selector reads a field. This matches the streaming overloads.
+            try
+            {
+                if (!stream.MoveNext())
+                {
+                    break;
+                }
+
+                results.Add(selector(stream.Current!));
+            }
+            catch (SimdJsonException) when (options.SkipMalformedLines)
+            {
+                // The stream survives a bad document; the next MoveNext continues past it.
+            }
+        }
+
+        return results;
+    }
+
     // ── Public API ────────────────────────────────────────────────────────────
 
     /// <summary>
