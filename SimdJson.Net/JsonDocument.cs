@@ -6,15 +6,23 @@ namespace SimdJson;
 
 /// <summary>
 /// Owns a parsed simdjson On-Demand document.
-/// Disposing releases the native memory. All child handles (<see cref="JsonValue"/>,
-/// <see cref="JsonArray"/>, <see cref="JsonObject"/>) become invalid after disposal.
+/// Disposing releases the native memory and frees the owning <see cref="SimdJsonParser"/> for the
+/// next parse. All child handles (<see cref="JsonValue"/>, <see cref="JsonArray"/>,
+/// <see cref="JsonObject"/>) throw <see cref="ObjectDisposedException"/> after the document is disposed.
 /// </summary>
 public sealed class JsonDocument : IDisposable
 {
     internal nint Handle;
+    private readonly SimdJsonParser? _parser;
     private bool _disposed;
 
-    internal JsonDocument(nint handle) => Handle = handle;
+    internal JsonDocument(nint handle, SimdJsonParser? parser)
+    {
+        Handle = handle;
+        _parser = parser;
+    }
+
+    internal bool IsDisposed => _disposed;
 
     /// <summary>Gets the JSON type of the document root.</summary>
     public JsonValueKind ValueKind
@@ -398,8 +406,9 @@ public sealed class JsonDocument : IDisposable
 
     /// <summary>
     /// Returns the document root as a <see cref="JsonValue"/>.
-    /// Only valid when the root is a scalar (number, string, bool, null).
-    /// Throws <see cref="SimdJsonException"/> if the root is an array or object.
+    /// Only valid when the root is an array or object.
+    /// Throws <see cref="SimdJsonException"/> if the root is a scalar (number, string, bool, null);
+    /// use the scalar getters such as <see cref="GetInt64"/> or <see cref="GetString()"/> instead.
     /// </summary>
     public JsonValue GetValue()
     {
@@ -452,23 +461,29 @@ public sealed class JsonDocument : IDisposable
     /// <remarks>
     /// The <see cref="JsonValue"/> passed to <paramref name="callback"/> is borrowed —
     /// it is valid only for the duration of the callback invocation and must not be disposed
-    /// or stored for use after the callback returns.
+    /// or stored for use after the callback returns. An exception thrown by the callback stops
+    /// the iteration and is rethrown to the caller.
     /// </remarks>
     public unsafe void ForEachAtPath(string path, Action<JsonValue> callback)
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(callback);
         int maxBytes = Encoding.UTF8.GetMaxByteCount(path.Length);
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(path, buf);
-        var gcHandle = GCHandle.Alloc(callback);
+        var context = new JsonValue.WildcardContext(callback);
+        var gcHandle = GCHandle.Alloc(context);
         try
         {
+            int err;
             fixed (byte* p = buf)
             {
-                SimdJsonException.ThrowIfError(NativeMethods.DocumentForEachAtPath(
-                    Handle, p, (nuint)len, JsonValue.s_wildcardTrampolinePtr, GCHandle.ToIntPtr(gcHandle)));
+                err = NativeMethods.DocumentForEachAtPath(
+                    Handle, p, (nuint)len, JsonValue.s_wildcardTrampolinePtr, GCHandle.ToIntPtr(gcHandle));
             }
+            context.Rethrow();
+            SimdJsonException.ThrowIfError(err);
         }
         finally { gcHandle.Free(); }
     }
@@ -483,5 +498,6 @@ public sealed class JsonDocument : IDisposable
         _disposed = true;
         NativeMethods.DestroyDocument(Handle);
         Handle = 0;
+        _parser?.OnDocumentDisposed(this);
     }
 }

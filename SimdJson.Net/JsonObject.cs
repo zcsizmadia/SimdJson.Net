@@ -22,13 +22,26 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     }
 
     /// <summary>
+    /// Throws if this object, or the document that owns its native memory, has been disposed.
+    /// </summary>
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_owner is { IsDisposed: true })
+        {
+            throw new ObjectDisposedException(nameof(JsonDocument),
+                "The JsonDocument that owns this object has been disposed.");
+        }
+    }
+
+    /// <summary>
     /// Returns the number of fields (requires a full native scan — use sparingly).
     /// </summary>
     public int Count
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfDisposed();
             SimdJsonException.ThrowIfError(NativeMethods.ObjectCount(Handle, out nuint n));
             return (int)n;
         }
@@ -37,7 +50,7 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     /// <summary>Gets a field by key (order-insensitive lookup).</summary>
     public unsafe JsonValue GetField(string key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         int maxBytes = Encoding.UTF8.GetMaxByteCount(key.Length) + 1;
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(key, buf);
@@ -72,7 +85,7 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     /// <summary>Iterates over all key-value pairs.</summary>
     public IEnumerator<JsonProperty> GetEnumerator()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ObjectBegin(Handle, out nint iter));
         try
         {
@@ -109,7 +122,7 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     /// <summary>Gets a value via a JSON Pointer path (e.g. <c>"/address/city"</c>).</summary>
     public unsafe JsonValue AtPointer(string pointer)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         int maxBytes = Encoding.UTF8.GetMaxByteCount(pointer.Length) + 1;
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(pointer, buf);
@@ -124,7 +137,7 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     /// <summary>Gets a value via a JSONPath expression (e.g. <c>"$.address.city"</c>).</summary>
     public unsafe JsonValue AtPath(string jsonPath)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         int maxBytes = Encoding.UTF8.GetMaxByteCount(jsonPath.Length) + 1;
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(jsonPath, buf);
@@ -142,7 +155,7 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     /// </summary>
     public unsafe JsonValue FindField(string key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         int maxBytes = Encoding.UTF8.GetMaxByteCount(key.Length) + 1;
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(key, buf);
@@ -157,7 +170,7 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     /// <summary>Returns <see langword="true"/> if the object has no fields.</summary>
     public bool IsEmpty()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ObjectIsEmpty(Handle, out int v));
         return v != 0;
     }
@@ -168,7 +181,7 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     /// </summary>
     public unsafe JsonValue FindFieldUnordered(string key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         int maxBytes = Encoding.UTF8.GetMaxByteCount(key.Length) + 1;
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(key, buf);
@@ -197,20 +210,25 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     /// </remarks>
     public unsafe void ForEachAtPath(string path, Action<JsonValue> callback)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(callback);
         int maxBytes = Encoding.UTF8.GetMaxByteCount(path.Length);
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(path, buf);
-        var gcHandle = System.Runtime.InteropServices.GCHandle.Alloc(callback);
+        var context = new JsonValue.WildcardContext(callback);
+        var gcHandle = System.Runtime.InteropServices.GCHandle.Alloc(context);
         try
         {
+            int err;
             fixed (byte* p = buf)
             {
-                SimdJsonException.ThrowIfError(NativeMethods.ObjectForEachAtPath(
+                err = NativeMethods.ObjectForEachAtPath(
                     Handle, p, (nuint)len, JsonValue.s_wildcardTrampolinePtr,
-                    System.Runtime.InteropServices.GCHandle.ToIntPtr(gcHandle)));
+                    System.Runtime.InteropServices.GCHandle.ToIntPtr(gcHandle));
             }
+            context.Rethrow();
+            SimdJsonException.ThrowIfError(err);
         }
         finally { gcHandle.Free(); }
     }
@@ -235,7 +253,7 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     /// </summary>
     public unsafe string GetRawJson()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ObjectRawJson(Handle, out byte* ptr, out nuint len));
         return Encoding.UTF8.GetString(ptr, (int)len);
     }
@@ -246,7 +264,7 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     /// </summary>
     public unsafe ReadOnlySpan<byte> GetRawJsonSpan()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ObjectRawJson(Handle, out byte* ptr, out nuint len));
         return new ReadOnlySpan<byte>(ptr, (int)len);
     }
@@ -254,7 +272,7 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     /// <summary>Resets the object iterator so the object can be traversed again.</summary>
     public void Reset()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ObjectReset(Handle));
     }
 

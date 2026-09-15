@@ -37,8 +37,8 @@ typedef void* SimdJsonArrayIter; // iterator over an array
 typedef void* SimdJsonObjectIter;// iterator over an object
 
 // ─── Error codes ────────────────────────────────────────────────────────────
-// Mirrors simdjson::error_code values (cast to int32_t).
-// SUCCESS == 0, all error conditions are > 0.
+// Bridge-specific codes derived from simdjson::error_code.
+// SUCCESS == 0, all error conditions are negative.
 typedef int32_t SimdJsonError;
 
 #define SIMDJSON_BRIDGE_SUCCESS                0
@@ -51,6 +51,10 @@ typedef int32_t SimdJsonError;
 #define SIMDJSON_BRIDGE_ERR_ITERATION_ERROR   -7
 #define SIMDJSON_BRIDGE_ERR_INVALID_POINTER   -8   // INVALID_JSON_POINTER
 #define SIMDJSON_BRIDGE_ERR_SCALAR_DOCUMENT   -9   // SCALAR_DOCUMENT_AS_VALUE
+#define SIMDJSON_BRIDGE_ERR_NUMBER_OUT_OF_RANGE -10 // NUMBER_OUT_OF_RANGE / BIGINT_ERROR
+#define SIMDJSON_BRIDGE_ERR_MEMORY            -11  // MEMALLOC / OUT_OF_CAPACITY
+#define SIMDJSON_BRIDGE_ERR_DEPTH             -12  // DEPTH_ERROR
+#define SIMDJSON_BRIDGE_ERR_TRAILING_CONTENT  -13  // TRAILING_CONTENT
 #define SIMDJSON_BRIDGE_ERR_UNKNOWN           -99
 
 // ─── JSON value types ────────────────────────────────────────────────────────
@@ -229,8 +233,9 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectGetFieldByKey(
 
 /**
  * Releases a SimdJsonValue, SimdJsonArray, or SimdJsonObject handle.
- * String pointers returned by SimdJsonNative_ValueGetString point into the
- * document buffer and remain valid until the document is destroyed.
+ * String pointers returned by SimdJsonNative_ValueGetString point into the owning
+ * PARSER's string buffer, not into the document. They remain valid only until the
+ * next SimdJsonNative_Parse call on that parser, or until the parser is destroyed.
  */
 SJNATIVE_API void SJNATIVE_CALL SimdJsonNative_DestroyValue(SimdJsonValue value);
 SJNATIVE_API void SJNATIVE_CALL SimdJsonNative_DestroyArray(SimdJsonArray array);
@@ -253,7 +258,8 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueIsInteger(
 // ─── Raw JSON access ─────────────────────────────────────────────────────────
 
 /**
- * Returns the raw JSON token for a scalar value (quotes included for strings).
+ * Returns the raw JSON token for a scalar value (quotes included for strings),
+ * with any trailing whitespace trimmed.
  * For arrays/objects returns only the opening '[' or '{'.
  * The pointer is valid for the lifetime of the owning document.
  */
@@ -338,7 +344,8 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentRewind(SimdJsonD
 
 // ─── Array and Object index/reset ────────────────────────────────────────────
 
-/** Returns the element at a zero-based index without iterating from the start. */
+/** Returns the element at a zero-based index. Resets the array iterator first, so the
+ *  index is always absolute; this rescans from the start (O(n)). */
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayAt(
     SimdJsonArray array, size_t index, SimdJsonValue* out_value);
 
@@ -404,8 +411,8 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentIsString(
 
 /**
  * Returns the document root as a generic SimdJsonValue handle.
- * Fails with SIMDJSON_BRIDGE_ERR_SCALAR_DOCUMENT if the root is an array or object;
- * use DocumentGetArray / DocumentGetObject in those cases.
+ * Fails with SIMDJSON_BRIDGE_ERR_SCALAR_DOCUMENT if the root is a scalar; use the
+ * DocumentGet* scalar getters in that case.
  */
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetValue(
     SimdJsonDocument doc, SimdJsonValue* out_value);
@@ -473,7 +480,8 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetNumber(
  * Returns the string value allowing lone Unicode surrogates (WTF-8 / CESU-8).
  * The returned bytes may not be valid UTF-8. Use for round-tripping JSON that
  * was produced by runtimes (e.g. Java) that emit lone surrogates.
- * The pointer is valid for the lifetime of the owning document.
+ * Like ValueGetString, the pointer lives in the owning parser's string buffer and is
+ * invalidated by the next parse on that parser.
  */
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetWobblyString(
     SimdJsonValue value, const char** out_ptr, size_t* out_len);

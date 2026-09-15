@@ -1,6 +1,7 @@
 using System.Text;
 using System.Runtime.InteropServices;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using SimdJson.Internal;
 
 namespace SimdJson;
@@ -24,12 +25,26 @@ public sealed class JsonValue : IDisposable
         _isBorrowed = isBorrowed;
     }
 
+    /// <summary>
+    /// Throws if this value, or the document that owns its native memory, has been disposed.
+    /// Without the owner check, using a value after its document is gone would read freed memory.
+    /// </summary>
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_owner is { IsDisposed: true })
+        {
+            throw new ObjectDisposedException(nameof(JsonDocument),
+                "The JsonDocument that owns this value has been disposed.");
+        }
+    }
+
     /// <summary>Gets the JSON type of this value.</summary>
     public JsonValueKind ValueKind
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfDisposed();
             SimdJsonException.ThrowIfError(NativeMethods.ValueGetType(Handle, out var kind));
             return kind;
         }
@@ -38,7 +53,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Gets the value as a <see cref="string"/>. Throws if not a JSON string.</summary>
     public unsafe string GetString()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetString(Handle, out byte* ptr, out nuint len));
         return Encoding.UTF8.GetString(ptr, (int)len);
     }
@@ -54,7 +69,7 @@ public sealed class JsonValue : IDisposable
             return GetString();
         }
 
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetStringAllowReplacement(Handle, out byte* ptr, out nuint len));
         return Encoding.UTF8.GetString(ptr, (int)len);
     }
@@ -65,7 +80,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public unsafe ReadOnlySpan<byte> GetStringSpan()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetString(Handle, out byte* ptr, out nuint len));
         return new ReadOnlySpan<byte>(ptr, (int)len);
     }
@@ -81,7 +96,7 @@ public sealed class JsonValue : IDisposable
             return GetStringSpan();
         }
 
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetStringAllowReplacement(Handle, out byte* ptr, out nuint len));
         return new ReadOnlySpan<byte>(ptr, (int)len);
     }
@@ -89,7 +104,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Gets the value as a <see cref="double"/>. Throws if not a number.</summary>
     public double GetDouble()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetDouble(Handle, out double v));
         return v;
     }
@@ -97,7 +112,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Gets the value as an <see cref="long"/>. Throws if not an integer.</summary>
     public long GetInt64()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetInt64(Handle, out long v));
         return v;
     }
@@ -105,7 +120,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Gets the value as a <see cref="ulong"/>. Throws if not an unsigned integer.</summary>
     public ulong GetUInt64()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetUInt64(Handle, out ulong v));
         return v;
     }
@@ -113,7 +128,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Gets the value as a <see cref="bool"/>. Throws if not a boolean.</summary>
     public bool GetBool()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetBool(Handle, out int v));
         return v != 0;
     }
@@ -121,7 +136,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Returns <see langword="true"/> if this value is a JSON null.</summary>
     public bool IsNull()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueIsNull(Handle, out int v));
         return v != 0;
     }
@@ -129,7 +144,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Gets the value as a <see cref="JsonArray"/>. Throws if not an array.</summary>
     public JsonArray GetArray()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetArray(Handle, out var h));
         return new JsonArray(h, _owner!);
     }
@@ -137,7 +152,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Gets the value as a <see cref="JsonObject"/>. Throws if not an object.</summary>
     public JsonObject GetObject()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetObject(Handle, out var h));
         return new JsonObject(h, _owner!);
     }
@@ -147,7 +162,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Gets the value as an <see cref="int"/>. Throws if not an integer, or if the value overflows <see cref="int"/>.</summary>
     public int GetInt32()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetInt32(Handle, out int v));
         return v;
     }
@@ -155,7 +170,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Gets the value as a <see cref="uint"/>. Throws if not an integer, or if the value overflows <see cref="uint"/>.</summary>
     public uint GetUInt32()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetUInt32(Handle, out uint v));
         return v;
     }
@@ -163,8 +178,29 @@ public sealed class JsonValue : IDisposable
     /// <summary>Gets the value as a <see cref="float"/>. Throws if not a number.</summary>
     public float GetFloat() => (float)GetDouble();
 
-    /// <summary>Gets the value as a <see cref="decimal"/>. Throws if not a number.</summary>
-    public decimal GetDecimal() => (decimal)GetDouble();
+    /// <summary>
+    /// Gets the value as a <see cref="decimal"/>, parsed from the raw JSON token so that
+    /// values with more than 17 significant digits keep their precision.
+    /// Throws <see cref="SimdJsonException"/> if the value is not a number or does not fit
+    /// in a <see cref="decimal"/>.
+    /// </summary>
+    public decimal GetDecimal()
+    {
+        ThrowIfDisposed();
+        if (ValueKind != JsonValueKind.Number)
+        {
+            throw new SimdJsonException(-2);
+        }
+
+        ReadOnlySpan<byte> token = GetRawJsonTokenSpan();
+        if (!decimal.TryParse(token, System.Globalization.NumberStyles.Float,
+                System.Globalization.CultureInfo.InvariantCulture, out decimal result))
+        {
+            throw new SimdJsonException(-10);
+        }
+
+        return result;
+    }
 
     // ── Try-get value methods ────────────────────────────────────────────────
 
@@ -241,7 +277,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Gets a child field by key. Throws if this value is not an object.</summary>
     public unsafe JsonValue GetField(string key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         int maxBytes = Encoding.UTF8.GetMaxByteCount(key.Length) + 1;
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(key, buf);
@@ -264,7 +300,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public JsonNumberType GetNumberType()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetNumberType(Handle, out var t));
         return t;
     }
@@ -275,7 +311,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public bool IsNegative()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueIsNegative(Handle, out int v));
         return v != 0;
     }
@@ -286,7 +322,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public bool IsInteger()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueIsInteger(Handle, out int v));
         return v != 0;
     }
@@ -300,7 +336,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public unsafe string GetRawJsonToken()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueRawJsonToken(Handle, out byte* ptr, out nuint len));
         return Encoding.UTF8.GetString(ptr, (int)len);
     }
@@ -311,7 +347,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public unsafe ReadOnlySpan<byte> GetRawJsonTokenSpan()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueRawJsonToken(Handle, out byte* ptr, out nuint len));
         return new ReadOnlySpan<byte>(ptr, (int)len);
     }
@@ -322,7 +358,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public unsafe string GetRawJson()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueRawJson(Handle, out byte* ptr, out nuint len));
         return Encoding.UTF8.GetString(ptr, (int)len);
     }
@@ -335,7 +371,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public double GetDoubleInString()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetDoubleInString(Handle, out double v));
         return v;
     }
@@ -346,7 +382,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public long GetInt64InString()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetInt64InString(Handle, out long v));
         return v;
     }
@@ -357,7 +393,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public ulong GetUInt64InString()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetUInt64InString(Handle, out ulong v));
         return v;
     }
@@ -391,7 +427,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public unsafe JsonValue AtPointer(string pointer)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         int maxBytes = Encoding.UTF8.GetMaxByteCount(pointer.Length) + 1;
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(pointer, buf);
@@ -409,7 +445,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public unsafe JsonValue AtPath(string jsonPath)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         int maxBytes = Encoding.UTF8.GetMaxByteCount(jsonPath.Length) + 1;
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(jsonPath, buf);
@@ -427,7 +463,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public unsafe JsonValue FindFieldUnordered(string key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         int maxBytes = Encoding.UTF8.GetMaxByteCount(key.Length) + 1;
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(key, buf);
@@ -453,7 +489,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public unsafe JsonValue FindField(string key)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         int maxBytes = Encoding.UTF8.GetMaxByteCount(key.Length) + 1;
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(key, buf);
@@ -486,7 +522,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public bool IsScalar()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueIsScalar(Handle, out int v));
         return v != 0;
     }
@@ -494,7 +530,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Returns <see langword="true"/> if this value is a JSON string.</summary>
     public bool IsString()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueIsString(Handle, out int v));
         return v != 0;
     }
@@ -511,7 +547,7 @@ public sealed class JsonValue : IDisposable
     public nuint CurrentOffset(JsonDocument owningDocument)
     {
         ArgumentNullException.ThrowIfNull(owningDocument);
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueCurrentOffset(Handle, owningDocument.Handle, out nuint offset));
         return offset;
     }
@@ -519,7 +555,7 @@ public sealed class JsonValue : IDisposable
     /// <summary>Returns the current JSON nesting depth (0 = root level).</summary>
     public int CurrentDepth()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueCurrentDepth(Handle, out int depth));
         return depth;
     }
@@ -534,7 +570,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public JsonNumber GetNumber()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetNumber(Handle, out var n));
         return new JsonNumber(
             (JsonNumberType)n.Type,
@@ -552,7 +588,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public unsafe ReadOnlySpan<byte> GetWobblyStringSpan()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetWobblyString(Handle, out byte* ptr, out nuint len));
         return new ReadOnlySpan<byte>(ptr, (int)len);
     }
@@ -581,7 +617,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public unsafe ReadOnlySpan<byte> GetRawJsonStringSpan()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetRawJsonString(Handle, out byte* ptr, out nuint len));
         return new ReadOnlySpan<byte>(ptr, (int)len);
     }
@@ -593,7 +629,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public unsafe string GetRawJsonString()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetRawJsonString(Handle, out byte* ptr, out nuint len));
         return Encoding.UTF8.GetString(ptr, (int)len);
     }
@@ -606,7 +642,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public int CountElements()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueCountElements(Handle, out nuint n));
         return (int)n;
     }
@@ -617,7 +653,7 @@ public sealed class JsonValue : IDisposable
     /// </summary>
     public int CountFields()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueCountFields(Handle, out nuint n));
         return (int)n;
     }
@@ -634,24 +670,60 @@ public sealed class JsonValue : IDisposable
     /// </remarks>
     public unsafe void ForEachAtPath(string path, Action<JsonValue> callback)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(callback);
         int maxBytes = Encoding.UTF8.GetMaxByteCount(path.Length);
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(path, buf);
-        var gcHandle = GCHandle.Alloc(callback);
+        var context = new WildcardContext(callback);
+        var gcHandle = GCHandle.Alloc(context);
         try
         {
+            int err;
             fixed (byte* p = buf)
             {
-                SimdJsonException.ThrowIfError(NativeMethods.ValueForEachAtPath(
-                    Handle, p, (nuint)len, s_wildcardTrampolinePtr, GCHandle.ToIntPtr(gcHandle)));
+                err = NativeMethods.ValueForEachAtPath(
+                    Handle, p, (nuint)len, s_wildcardTrampolinePtr, GCHandle.ToIntPtr(gcHandle));
             }
+            context.Rethrow();
+            SimdJsonException.ThrowIfError(err);
         }
         finally { gcHandle.Free(); }
     }
 
     // ── Internal wildcard trampoline ──────────────────────────────────────────
+
+    /// <summary>
+    /// Carries the user callback across the native call and captures any exception it throws.
+    /// An exception must not propagate out of the <see cref="UnmanagedCallersOnlyAttribute"/>
+    /// frame below — the runtime would terminate the process — so it is stored here and
+    /// rethrown by the caller once the native iteration has returned.
+    /// </summary>
+    internal sealed class WildcardContext(Action<JsonValue> callback)
+    {
+        private readonly Action<JsonValue> _callback = callback;
+        private ExceptionDispatchInfo? _fault;
+
+        internal void Invoke(JsonValue value)
+        {
+            if (_fault is not null)
+            {
+                return;
+            }
+
+            try
+            {
+                _callback(value);
+            }
+            catch (Exception ex)
+            {
+                _fault = ExceptionDispatchInfo.Capture(ex);
+            }
+        }
+
+        internal void Rethrow() => _fault?.Throw();
+    }
 
     internal static readonly unsafe nint s_wildcardTrampolinePtr =
         (nint)(delegate* unmanaged[Cdecl]<nint, nint, void>)&WildcardTrampoline;
@@ -659,8 +731,13 @@ public sealed class JsonValue : IDisposable
     [UnmanagedCallersOnly(CallConvs = [typeof(CallConvCdecl)])]
     private static void WildcardTrampoline(nint valueHandle, nint context)
     {
-        var action = (Action<JsonValue>)GCHandle.FromIntPtr(context).Target!;
+        var ctx = (WildcardContext)GCHandle.FromIntPtr(context).Target!;
         var tmp = new JsonValue(valueHandle, null, isBorrowed: true);
-        action(tmp);
+        ctx.Invoke(tmp);
+        // The native BridgeValue lives on the C++ stack for the duration of this call only.
+        // Poison the wrapper so a callback that stored it gets ObjectDisposedException
+        // instead of dereferencing a dead pointer.
+        tmp.Handle = 0;
+        tmp._disposed = true;
     }
 }

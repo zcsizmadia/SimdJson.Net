@@ -28,10 +28,12 @@ Every element yielded from `foreach` **must be disposed** before the next iterat
 
 | Member | Description |
 |--------|-------------|
-| `At(int)` | Element at zero-based index via the native `array.at()` call |
-| `ElementAt(int)` | Element at zero-based index via forward iteration |
+| `At(int)` | Element at an absolute zero-based index; rescans from the start of the array |
+| `ElementAt(int)` | Element at zero-based index via forward iteration from the current position |
 
-> `At()` and `ElementAt()` both advance the internal iterator. Call `Reset()` before reusing the array after either call.
+> `At()` resets the array iterator first, so its index is always absolute and repeated calls work.
+> `ElementAt()` counts from the current position — call `Reset()` before reusing the array after it,
+> and after any `foreach`.
 
 ## Pointer / path lookup
 
@@ -77,8 +79,7 @@ Console.WriteLine(nums.Count); // 3
 // IsEmpty — faster than Count == 0
 Console.WriteLine(nums.IsEmpty()); // False (after Reset)
 
-// At / ElementAt — reset between calls
-nums.Reset();
+// At — absolute index, no Reset needed
 using var first = nums.At(0);
 Console.WriteLine(first.GetInt64()); // 10
 

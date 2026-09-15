@@ -43,10 +43,13 @@ A tagged-union value type returned by `JsonValue.GetNumber()`. Retrieves both th
 | Member | Description |
 |--------|-------------|
 | `NumberType` | `JsonNumberType` sub-type |
-| `AsDouble()` | Value as `double` — works for `FloatingPoint`, `SignedInteger`, and `UnsignedInteger` |
+| `AsDouble()` | Value as `double` — works for `FloatingPoint`, `SignedInteger`, and `UnsignedInteger`; throws `InvalidOperationException` for `BigInteger` |
 | `AsInt64()` | Value as `long` — meaningful only for `SignedInteger` |
 | `AsUInt64()` | Value as `ulong` — meaningful only for `UnsignedInteger` |
 | `ToString()` | Decimal string representation |
+
+> For a `BigInteger`, `GetNumber()` succeeds and reports the type, but carries no numeric value —
+> read the digits with `JsonValue.GetRawJsonToken()`.
 
 ### Example
 

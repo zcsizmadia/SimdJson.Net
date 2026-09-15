@@ -26,11 +26,19 @@ public readonly struct JsonNumber
     /// Returns the value as a <see cref="double"/>.
     /// For floating-point numbers this is exact; for integers it may lose precision.
     /// </summary>
-    public double AsDouble() => _type == JsonNumberType.FloatingPoint
-        ? _floatingPoint
-        : _type == JsonNumberType.UnsignedInteger
-            ? (double)_unsignedInteger
-            : (double)_signedInteger;
+    /// <exception cref="InvalidOperationException">
+    /// <see cref="NumberType"/> is <see cref="JsonNumberType.BigInteger"/>. simdjson does not
+    /// supply a numeric value for those; read the digits with
+    /// <see cref="JsonValue.GetRawJsonToken"/> instead.
+    /// </exception>
+    public double AsDouble() => _type switch
+    {
+        JsonNumberType.FloatingPoint   => _floatingPoint,
+        JsonNumberType.UnsignedInteger => _unsignedInteger,
+        JsonNumberType.SignedInteger   => _signedInteger,
+        _ => throw new InvalidOperationException(
+            "This number does not fit in 64 bits. Use JsonValue.GetRawJsonToken() to read it as text."),
+    };
 
     /// <summary>
     /// Returns the value as a <see cref="long"/>. Only meaningful when

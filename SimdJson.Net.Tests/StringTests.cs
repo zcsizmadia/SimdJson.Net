@@ -184,8 +184,10 @@ public class RawJsonSpanTests
         using var doc = SimdJsonParser.Shared.Parse("""{"arr":[1,2,3]}""");
         using var arr = doc.GetField("arr").GetArray();
         var str = arr.GetRawJson();
-        // Re-open to get span (GetRawJson consumes)
-        using var doc2 = SimdJsonParser.Shared.Parse("""{"arr":[1,2,3]}""");
+        // Re-open to get span (GetRawJson consumes). A second parser is required: one parser
+        // supports a single live document, and its buffers back the span returned below.
+        using var parser2 = new SimdJsonParser();
+        using var doc2 = parser2.Parse("""{"arr":[1,2,3]}""");
         using var arr2 = doc2.GetField("arr").GetArray();
         var span = arr2.GetRawJsonSpan();
         await Assert.That(System.Text.Encoding.UTF8.GetString(span)).IsEqualTo(str);
@@ -198,7 +200,8 @@ public class RawJsonSpanTests
         using var doc = SimdJsonParser.Shared.Parse(json);
         using var obj = doc.GetObject();
         var str = obj.GetRawJson();
-        using var doc2 = SimdJsonParser.Shared.Parse(json);
+        using var parser2 = new SimdJsonParser();
+        using var doc2 = parser2.Parse(json);
         using var obj2 = doc2.GetObject();
         var span = obj2.GetRawJsonSpan();
         await Assert.That(System.Text.Encoding.UTF8.GetString(span)).IsEqualTo(str);

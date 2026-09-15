@@ -28,12 +28,41 @@ static SimdJsonError translate_error(simdjson::error_code ec) noexcept {
         case UTF8_ERROR:
         case UNESCAPED_CHARS:
         case UNCLOSED_STRING:
-        case NUMBER_ERROR:               return SIMDJSON_BRIDGE_ERR_PARSE_ERROR;
-        case OUT_OF_ORDER_ITERATION:     return SIMDJSON_BRIDGE_ERR_ITERATION_ERROR;
-        case INVALID_JSON_POINTER:       return SIMDJSON_BRIDGE_ERR_INVALID_POINTER;
+        case NUMBER_ERROR:
+        case EMPTY:
+        case STRING_ERROR:
+        case T_ATOM_ERROR:
+        case F_ATOM_ERROR:
+        case N_ATOM_ERROR:
+        case INSUFFICIENT_PADDING:
+        case OUT_OF_BOUNDS:
+        case UNINITIALIZED:
+        case UNEXPECTED_ERROR:
+        case IO_ERROR:                   return SIMDJSON_BRIDGE_ERR_PARSE_ERROR;
+        case OUT_OF_ORDER_ITERATION:
+        case PARSER_IN_USE:              return SIMDJSON_BRIDGE_ERR_ITERATION_ERROR;
+        case INVALID_JSON_POINTER:
+        case INVALID_URI_FRAGMENT:       return SIMDJSON_BRIDGE_ERR_INVALID_POINTER;
         case SCALAR_DOCUMENT_AS_VALUE:   return SIMDJSON_BRIDGE_ERR_SCALAR_DOCUMENT;
+        case NUMBER_OUT_OF_RANGE:
+        case BIGINT_ERROR:               return SIMDJSON_BRIDGE_ERR_NUMBER_OUT_OF_RANGE;
+        case MEMALLOC:
+        case OUT_OF_CAPACITY:            return SIMDJSON_BRIDGE_ERR_MEMORY;
+        case DEPTH_ERROR:                return SIMDJSON_BRIDGE_ERR_DEPTH;
+        case TRAILING_CONTENT:           return SIMDJSON_BRIDGE_ERR_TRAILING_CONTENT;
         default:                         return SIMDJSON_BRIDGE_ERR_UNKNOWN;
     }
+}
+
+// raw_json_token() spans up to the next structural character, so scalar tokens carry any
+// whitespace that follows them. Trim it so callers see just the token.
+static std::string_view rtrim_json_whitespace(std::string_view sv) noexcept {
+    while (!sv.empty()) {
+        const char c = sv.back();
+        if (c != ' ' && c != '\t' && c != '\n' && c != '\r') { break; }
+        sv.remove_suffix(1);
+    }
+    return sv;
 }
 
 // ─── Internal structs ────────────────────────────────────────────────────────
@@ -110,25 +139,25 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_Parse(
     SimdJsonDocument* out_doc)
 {
     CHECK_NULL(parser);
-    CHECK_NULL(json);
     CHECK_NULL(out_doc);
+    if (!json && length != 0) return SIMDJSON_BRIDGE_ERR_NULL_POINTER;
 
     auto* p = static_cast<simdjson::ondemand::parser*>(parser);
 
     try {
-        auto* bd = new BridgeDocument();
+        auto bd = std::make_unique<BridgeDocument>();
 
         // Copy the input into an owned padded buffer so callers need not
         // manage padding themselves.
         bd->json_buf = simdjson::padded_string(json, length);
+        // padded_string's constructor is noexcept and reports allocation failure by
+        // leaving a null buffer behind.
+        if (length != 0 && bd->json_buf.data() == nullptr) return SIMDJSON_BRIDGE_ERR_MEMORY;
 
         auto err = p->iterate(bd->json_buf).get(bd->doc);
-        if (err) {
-            delete bd;
-            return translate_error(err);
-        }
+        if (err) return translate_error(err);
 
-        *out_doc = bd;
+        *out_doc = bd.release();
         return SIMDJSON_BRIDGE_SUCCESS;
     } catch (...) {
         return SIMDJSON_BRIDGE_ERR_UNKNOWN;
@@ -297,7 +326,13 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueIsNull(
     CHECK_NULL(value);
     CHECK_NULL(out_is_null);
     auto* bv = static_cast<BridgeValue*>(value);
-    *out_is_null = bv->value.is_null() ? 1 : 0;
+    // is_null() returns simdjson_result<bool>; the implicit bool conversion throws
+    // simdjson_error on failure (e.g. the token "nan"), which must never cross this
+    // extern "C" boundary. Take the error explicitly instead.
+    bool is_null;
+    auto err = bv->value.is_null().get(is_null);
+    if (err) return translate_error(err);
+    *out_is_null = is_null ? 1 : 0;
     return SIMDJSON_BRIDGE_SUCCESS;
 }
 
@@ -356,11 +391,15 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayBegin(
     CHECK_NULL(out_iter);
     auto* ba = static_cast<BridgeArray*>(array);
     try {
-        auto* it = new BridgeArrayIter();
-        it->array   = ba->array;
-        it->current = it->array.begin();
-        it->end     = it->array.end();
-        *out_iter = it;
+        auto it = std::make_unique<BridgeArrayIter>();
+        it->array = ba->array;
+        // begin()/end() return simdjson_result; converting them implicitly would throw
+        // on error instead of reporting it.
+        auto err = it->array.begin().get(it->current);
+        if (err) return translate_error(err);
+        err = it->array.end().get(it->end);
+        if (err) return translate_error(err);
+        *out_iter = it.release();
         return SIMDJSON_BRIDGE_SUCCESS;
     } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
 }
@@ -417,11 +456,13 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectBegin(
     CHECK_NULL(out_iter);
     auto* bo = static_cast<BridgeObject*>(object);
     try {
-        auto* it = new BridgeObjectIter();
-        it->object  = bo->object;
-        it->current = it->object.begin();
-        it->end     = it->object.end();
-        *out_iter = it;
+        auto it = std::make_unique<BridgeObjectIter>();
+        it->object = bo->object;
+        auto err = it->object.begin().get(it->current);
+        if (err) return translate_error(err);
+        err = it->object.end().get(it->end);
+        if (err) return translate_error(err);
+        *out_iter = it.release();
         return SIMDJSON_BRIDGE_SUCCESS;
     } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
 }
@@ -580,7 +621,7 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueRawJsonToken(
     CHECK_NULL(out_len);
     auto* bv = static_cast<BridgeValue*>(value);
     // raw_json_token() returns string_view directly (no error_code)
-    auto sv = bv->value.raw_json_token();
+    auto sv = rtrim_json_whitespace(bv->value.raw_json_token());
     *out_ptr = sv.data();
     *out_len = sv.size();
     return SIMDJSON_BRIDGE_SUCCESS;
@@ -837,11 +878,16 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ArrayAt(
     CHECK_NULL(out_value);
     auto* ba = static_cast<BridgeArray*>(array);
     try {
-        auto* bv = new BridgeValue();
+        // array::at() counts from the iterator's current position, so without this reset
+        // At(2) followed by At(0) would fail instead of returning the first element.
+        bool has_value;
+        auto reset_err = ba->array.reset().get(has_value);
+        if (reset_err) return translate_error(reset_err);
+        auto bv = std::make_unique<BridgeValue>();
         simdjson::error_code ec;
         ba->array.at(index).tie(bv->value, ec);
-        if (ec) { delete bv; return translate_error(ec); }
-        *out_value = bv;
+        if (ec) return translate_error(ec);
+        *out_value = bv.release();
         return SIMDJSON_BRIDGE_SUCCESS;
     } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
 }
@@ -1023,7 +1069,10 @@ extern "C" SimdJsonParser SJNATIVE_CALL SimdJsonNative_CreateParserWithCapacity(
     size_t max_capacity)
 {
     try {
-        return new simdjson::ondemand::parser(max_capacity);
+        // simdjson stores max_capacity verbatim, so a literal 0 would reject every
+        // non-empty document. Treat 0 as "library default".
+        return new simdjson::ondemand::parser(
+            max_capacity ? max_capacity : simdjson::SIMDJSON_MAXSIZE_BYTES);
     } catch (...) {
         return nullptr;
     }
@@ -1078,6 +1127,14 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetNumber(
     auto* bv = static_cast<BridgeValue*>(value);
     simdjson::ondemand::number num;
     auto err = bv->value.get_number().get(num);
+    // get_number() reports integers beyond 64 bits as BIGINT_ERROR. Surface that as the
+    // big-integer number type so callers can read the digits via RawJsonToken.
+    if (err == simdjson::BIGINT_ERROR) {
+        out_number->type = SIMDJSON_NUMBER_TYPE_BIG_INTEGER;
+        out_number->_pad = 0;
+        out_number->value.signed_integer = 0;
+        return SIMDJSON_BRIDGE_SUCCESS;
+    }
     if (err) return translate_error(err);
     auto nt = num.get_number_type();
     switch (nt) {
@@ -1299,6 +1356,12 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetNumber(
     auto* bd = static_cast<BridgeDocument*>(doc);
     simdjson::ondemand::number num;
     auto err = bd->doc.get_number().get(num);
+    if (err == simdjson::BIGINT_ERROR) {
+        out_number->type = SIMDJSON_NUMBER_TYPE_BIG_INTEGER;
+        out_number->_pad = 0;
+        out_number->value.signed_integer = 0;
+        return SIMDJSON_BRIDGE_SUCCESS;
+    }
     if (err) return translate_error(err);
     out_number->_pad = 0;
     switch (num.get_number_type()) {
@@ -1333,6 +1396,7 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentRawJsonToken(
     std::string_view sv;
     auto err = bd->doc.raw_json_token().get(sv);
     if (err) return translate_error(err);
+    sv = rtrim_json_whitespace(sv);
     *out_ptr = sv.data();
     *out_len = sv.size();
     return SIMDJSON_BRIDGE_SUCCESS;
@@ -1344,18 +1408,16 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseAllowIncompleteJson(
     SimdJsonParser parser, const char* json, size_t length, SimdJsonDocument* out_doc)
 {
     CHECK_NULL(parser);
-    CHECK_NULL(json);
     CHECK_NULL(out_doc);
+    if (!json && length != 0) return SIMDJSON_BRIDGE_ERR_NULL_POINTER;
     auto* p = static_cast<simdjson::ondemand::parser*>(parser);
     try {
-        auto* bd = new BridgeDocument();
+        auto bd = std::make_unique<BridgeDocument>();
         bd->json_buf = simdjson::padded_string(json, length);
+        if (length != 0 && bd->json_buf.data() == nullptr) return SIMDJSON_BRIDGE_ERR_MEMORY;
         simdjson::error_code err = p->iterate_allow_incomplete_json(bd->json_buf).get(bd->doc);
-        if (err) {
-            delete bd;
-            return translate_error(err);
-        }
-        *out_doc = bd;
+        if (err) return translate_error(err);
+        *out_doc = bd.release();
         return SIMDJSON_BRIDGE_SUCCESS;
     } catch (...) {
         return SIMDJSON_BRIDGE_ERR_UNKNOWN;
@@ -1371,9 +1433,10 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetRawJsonString(
     CHECK_NULL(out_ptr);
     CHECK_NULL(out_len);
     auto* bv = static_cast<BridgeValue*>(value);
-    // raw_json_token() is a non-consuming peek that returns the full token including quotes.
-    std::string_view token = bv->value.raw_json_token();
-    if (token.size() < 2 || token.front() != '"') {
+    // raw_json_token() is a non-consuming peek that spans from the token start to the next
+    // structural character, so it includes the closing quote plus any trailing whitespace.
+    std::string_view token = rtrim_json_whitespace(bv->value.raw_json_token());
+    if (token.size() < 2 || token.front() != '"' || token.back() != '"') {
         return SIMDJSON_BRIDGE_ERR_INCORRECT_TYPE;
     }
     // Return the inner bytes: after the opening quote, minus the closing quote.

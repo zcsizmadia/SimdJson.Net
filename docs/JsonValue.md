@@ -23,7 +23,7 @@ Represents a JSON value at a specific position in an On-Demand document. Can be 
 | `GetStringSpan(bool allowReplacement)` | Zero-allocation span with optional lone-surrogate replacement |
 | `GetDouble()` | As `double` |
 | `GetFloat()` | As `float` |
-| `GetDecimal()` | As `decimal` |
+| `GetDecimal()` | As `decimal`, parsed from the raw token so precision beyond `double` is kept |
 | `GetInt64()` | As `long` |
 | `GetUInt64()` | As `ulong` |
 | `GetInt32()` | As `int` (throws if not int32 or overflows) |

@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Runtime.CompilerServices;
+using System.Runtime.ExceptionServices;
 using System.Threading.Channels;
 
 namespace SimdJson;
@@ -180,8 +181,14 @@ public static class NdjsonParser
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
-        // Stores the first worker exception (workers capture their own faults).
-        Exception? workerFault = null;
+        // First failure from any worker. A reader failure surfaces here too, because the
+        // reader completes the line channel with its exception and the workers observe it.
+        Exception? fault = null;
+        void Fail(Exception ex)
+        {
+            Interlocked.CompareExchange(ref fault, ex, null);
+            cts.Cancel();
+        }
 
         // ── Reader task ──────────────────────────────────────────────────────
         var readerTask = Task.Run(async () =>
@@ -220,9 +227,7 @@ public static class NdjsonParser
                 }
                 catch (Exception ex) when (ex is not OperationCanceledException)
                 {
-                    // Capture first fault, then cancel everything.
-                    Interlocked.CompareExchange(ref workerFault, ex, null);
-                    cts.Cancel();
+                    Fail(ex);
                 }
                 finally
                 {
@@ -231,22 +236,33 @@ public static class NdjsonParser
             }, cts.Token);
         }
 
-        // Close the result channel once all workers are done.
+        // Close the result channel once all workers are done (normally, faulted, or cancelled).
         _ = Task.WhenAll(workerTasks)
                 .ContinueWith(_ => resultChannel.Writer.TryComplete(), TaskScheduler.Default);
 
         // ── Stream results to the caller ─────────────────────────────────────
-        // yield return is NOT inside a try-catch here (only inside the try-finally from
-        // 'using var cts' above), so CS1626 does not apply.
-        await foreach (var item in resultChannel.Reader.ReadAllAsync(cts.Token).ConfigureAwait(false))
-            yield return item;
+        // Enumerate with the caller's token, not cts.Token: a worker fault cancels cts, and
+        // reading with cts.Token would surface that as OperationCanceledException and hide
+        // the real exception. On a fault the workers exit, the result channel completes,
+        // this loop ends normally, and the fault is rethrown below.
+        try
+        {
+            await foreach (var item in resultChannel.Reader.ReadAllAsync(cancellationToken).ConfigureAwait(false))
+                yield return item;
+        }
+        finally
+        {
+            // Also reached when the consumer stops enumerating early: unblock the reader and
+            // workers, wait for them so the stream and parsers are released, and return any
+            // line buffers that were never consumed.
+            cts.Cancel();
+            try { await Task.WhenAll(readerTask, Task.WhenAll(workerTasks)).ConfigureAwait(false); } catch { }
+            while (lineChannel.Reader.TryRead(out var pending))
+                ArrayPool<byte>.Shared.Return(pending.buf);
+        }
 
-        // Await background tasks (exceptions already captured in workerFault).
-        try { await readerTask.ConfigureAwait(false); } catch { }
-        try { await Task.WhenAll(workerTasks).ConfigureAwait(false); } catch { }
-
-        if (workerFault is not null)
-            System.Runtime.ExceptionServices.ExceptionDispatchInfo.Capture(workerFault).Throw();
+        if (fault is not null)
+            ExceptionDispatchInfo.Capture(fault).Throw();
     }
 
     /// <summary>
@@ -275,6 +291,13 @@ public static class NdjsonParser
             });
 
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+
+        Exception? fault = null;
+        void Fail(Exception ex)
+        {
+            Interlocked.CompareExchange(ref fault, ex, null);
+            cts.Cancel();
+        }
 
         var readerTask = Task.Run(async () =>
         {
@@ -306,6 +329,12 @@ public static class NdjsonParser
                     await foreach (var (buf, len) in lineChannel.Reader.ReadAllAsync(cts.Token).ConfigureAwait(false))
                         TryParseAction(buf, len, parser, action, options);
                 }
+                catch (Exception ex) when (ex is not OperationCanceledException)
+                {
+                    // Without this a faulted worker would silently exit and, once every worker
+                    // is gone, the reader would block forever on the full line channel.
+                    Fail(ex);
+                }
                 finally
                 {
                     parser.Dispose();
@@ -313,8 +342,22 @@ public static class NdjsonParser
             }, cts.Token);
         }
 
-        await readerTask.ConfigureAwait(false);
-        await Task.WhenAll(workerTasks).ConfigureAwait(false);
+        try
+        {
+            await Task.WhenAll(readerTask, Task.WhenAll(workerTasks)).ConfigureAwait(false);
+        }
+        catch (OperationCanceledException) when (fault is not null)
+        {
+            // Cancellation we triggered ourselves; the real error is rethrown below.
+        }
+        finally
+        {
+            while (lineChannel.Reader.TryRead(out var pending))
+                ArrayPool<byte>.Shared.Return(pending.buf);
+        }
+
+        if (fault is not null)
+            ExceptionDispatchInfo.Capture(fault).Throw();
     }
 
     // ── Private helpers ───────────────────────────────────────────────────────
@@ -384,7 +427,7 @@ public static class NdjsonParser
         int readBufSize = Math.Max(options.ReadBufferSize, 4096);
         byte[] readBuf = ArrayPool<byte>.Shared.Rent(readBufSize);
         int offset = 0;
-        bool firstChunk = true;
+        bool bomChecked = false;
 
         // yield return inside try-finally (no catch) is permitted by the C# spec.
         try
@@ -409,13 +452,21 @@ public static class NdjsonParser
 
                 int lineStart = 0;
 
-                // Strip UTF-8 BOM from the very beginning of the stream (one-time).
-                if (firstChunk)
+                // Strip UTF-8 BOM from the very beginning of the stream (one-time). The first
+                // ReadAsync may return fewer than 3 bytes (pipes, sockets), so defer the check
+                // until 3 bytes are buffered, or until the data provably cannot start with a BOM.
+                if (!bomChecked)
                 {
-                    firstChunk = false;
-                    if (total >= 3 &&
-                        readBuf[0] == 0xEF && readBuf[1] == 0xBB && readBuf[2] == 0xBF)
-                        lineStart = 3;
+                    if (total >= 3)
+                    {
+                        bomChecked = true;
+                        if (readBuf[0] == 0xEF && readBuf[1] == 0xBB && readBuf[2] == 0xBF)
+                            lineStart = 3;
+                    }
+                    else if (eof || readBuf.AsSpan(0, total).IndexOf((byte)'\n') >= 0)
+                    {
+                        bomChecked = true;
+                    }
                 }
 
                 // Vectorized newline scan — IndexOf uses AVX2/SSE4.2 on .NET 8+.
