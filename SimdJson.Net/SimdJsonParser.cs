@@ -227,11 +227,80 @@ public sealed class SimdJsonParser : IDisposable
         return doc;
     }
 
+    private JsonDocument AttachDocument(nint docHandle, System.Buffers.MemoryHandle pin)
+    {
+        var doc = new JsonDocument(docHandle, this, pin);
+        _liveDocument = doc;
+        return doc;
+    }
+
     internal void OnDocumentDisposed(JsonDocument doc)
     {
         if (ReferenceEquals(_liveDocument, doc))
         {
             _liveDocument = null;
+        }
+    }
+
+    /// <summary>
+    /// The readable slack, in bytes, that a <see cref="ParseInPlace"/> buffer must have past the
+    /// end of the JSON. simdjson reads this far beyond the document; the contents do not matter.
+    /// </summary>
+    public static int RequiredPadding => (int)NativeMethods.GetPadding();
+
+    /// <summary>
+    /// Parses UTF-8 JSON directly out of <paramref name="buffer"/> without copying it.
+    /// </summary>
+    /// <param name="buffer">
+    /// The caller's buffer. The JSON occupies the first <paramref name="jsonLength"/> bytes and the
+    /// remainder is padding, which must be at least <see cref="RequiredPadding"/> bytes.
+    /// </param>
+    /// <param name="jsonLength">Length of the JSON text within <paramref name="buffer"/>.</param>
+    /// <remarks>
+    /// <para>
+    /// Unlike <see cref="Parse(ReadOnlySpan{byte})"/>, which copies the input into memory the
+    /// document owns, the returned document reads straight out of <paramref name="buffer"/>. The
+    /// buffer is pinned until the document is disposed, and it must not be written to, returned to
+    /// a pool, or otherwise reused before then. Getting that wrong produces wrong answers rather
+    /// than an exception, so prefer the copying overload unless a profile shows the copy matters.
+    /// </para>
+    /// <para>
+    /// Sizing a pooled buffer: rent <c>jsonLength + SimdJsonParser.RequiredPadding</c> and pass the
+    /// whole rented array, since <see cref="System.Buffers.ArrayPool{T}"/> may return a larger one.
+    /// </para>
+    /// </remarks>
+    /// <exception cref="ArgumentOutOfRangeException">
+    /// <paramref name="jsonLength"/> is negative or larger than the buffer, or the buffer does not
+    /// leave <see cref="RequiredPadding"/> bytes of slack past the JSON.
+    /// </exception>
+    public unsafe JsonDocument ParseInPlace(ReadOnlyMemory<byte> buffer, int jsonLength)
+    {
+        ThrowIfBusy();
+        ArgumentOutOfRangeException.ThrowIfNegative(jsonLength);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(jsonLength, buffer.Length);
+
+        int padding = RequiredPadding;
+        if (buffer.Length - jsonLength < padding)
+        {
+            throw new ArgumentOutOfRangeException(nameof(buffer),
+                $"ParseInPlace needs at least {padding} readable bytes after the JSON. " +
+                $"The buffer is {buffer.Length} bytes with {jsonLength} bytes of JSON, leaving " +
+                $"{buffer.Length - jsonLength}. Rent or allocate jsonLength + " +
+                $"{nameof(SimdJsonParser)}.{nameof(RequiredPadding)} bytes.");
+        }
+
+        var pin = buffer.Pin();
+        try
+        {
+            int err = NativeMethods.ParseInPlace(
+                _handle, (byte*)pin.Pointer, (nuint)jsonLength, (nuint)buffer.Length, out nint docHandle);
+            SimdJsonException.ThrowIfError(err);
+            return AttachDocument(docHandle, pin);
+        }
+        catch
+        {
+            pin.Dispose();
+            throw;
         }
     }
 

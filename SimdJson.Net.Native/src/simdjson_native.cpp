@@ -34,7 +34,6 @@ static SimdJsonError translate_error(simdjson::error_code ec) noexcept {
         case T_ATOM_ERROR:
         case F_ATOM_ERROR:
         case N_ATOM_ERROR:
-        case INSUFFICIENT_PADDING:
         case OUT_OF_BOUNDS:
         case UNINITIALIZED:
         case UNEXPECTED_ERROR:
@@ -49,6 +48,7 @@ static SimdJsonError translate_error(simdjson::error_code ec) noexcept {
         case MEMALLOC:
         case OUT_OF_CAPACITY:            return SIMDJSON_BRIDGE_ERR_MEMORY;
         case DEPTH_ERROR:                return SIMDJSON_BRIDGE_ERR_DEPTH;
+        case INSUFFICIENT_PADDING:       return SIMDJSON_BRIDGE_ERR_INSUFFICIENT_PADDING;
         case TRAILING_CONTENT:           return SIMDJSON_BRIDGE_ERR_TRAILING_CONTENT;
         default:
             // No dedicated bridge code. Rather than collapsing every remaining error to a
@@ -214,6 +214,42 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_Parse(
         auto err = p->iterate(bd->json_buf).get(bd->doc);
         if (err) return translate_error(err);
 
+        *out_doc = bd.release();
+        return SIMDJSON_BRIDGE_SUCCESS;
+    } catch (...) {
+        return SIMDJSON_BRIDGE_ERR_UNKNOWN;
+    }
+}
+
+extern "C" size_t SJNATIVE_CALL SimdJsonNative_GetPadding(void) {
+    return simdjson::SIMDJSON_PADDING;
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseInPlace(
+    SimdJsonParser    parser,
+    const char*       json,
+    size_t            length,
+    size_t            capacity,
+    SimdJsonDocument* out_doc)
+{
+    CHECK_NULL(parser);
+    CHECK_NULL(out_doc);
+    if (!json && length != 0) return SIMDJSON_BRIDGE_ERR_NULL_POINTER;
+    // Guard the subtraction before simdjson reads past the JSON: capacity is the caller's
+    // total readable length, so anything smaller than length is a caller error.
+    if (capacity < length ||
+        capacity - length < simdjson::SIMDJSON_PADDING) {
+        return SIMDJSON_BRIDGE_ERR_INSUFFICIENT_PADDING;
+    }
+
+    auto* p = static_cast<simdjson::ondemand::parser*>(parser);
+
+    try {
+        // No padded_string here: the document borrows the caller's buffer, which must stay
+        // alive and unmodified until the document is destroyed. json_buf stays empty.
+        auto bd = std::make_unique<BridgeDocument>();
+        auto err = p->iterate(json, length, capacity).get(bd->doc);
+        if (err) return translate_error(err);
         *out_doc = bd.release();
         return SIMDJSON_BRIDGE_SUCCESS;
     } catch (...) {

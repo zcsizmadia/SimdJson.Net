@@ -14,12 +14,25 @@ public sealed class JsonDocument : IDisposable
 {
     internal nint Handle;
     private readonly SimdJsonParser? _parser;
+    private System.Buffers.MemoryHandle _pin;
+    private readonly bool _pinned;
     private bool _disposed;
 
     internal JsonDocument(nint handle, SimdJsonParser? parser)
     {
         Handle = handle;
         _parser = parser;
+    }
+
+    /// <summary>
+    /// Creates a document that borrows a caller-owned buffer. The pin is released on dispose;
+    /// until then the buffer must not move or change.
+    /// </summary>
+    internal JsonDocument(nint handle, SimdJsonParser? parser, System.Buffers.MemoryHandle pin)
+        : this(handle, parser)
+    {
+        _pin = pin;
+        _pinned = true;
     }
 
     internal bool IsDisposed => _disposed;
@@ -537,6 +550,14 @@ public sealed class JsonDocument : IDisposable
         _disposed = true;
         NativeMethods.DestroyDocument(Handle);
         Handle = 0;
+
+        // Release the caller's buffer only after the native document is gone, since it was
+        // reading directly out of it.
+        if (_pinned)
+        {
+            _pin.Dispose();
+        }
+
         _parser?.OnDocumentDisposed(this);
     }
 }
