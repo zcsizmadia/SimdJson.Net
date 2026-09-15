@@ -41,10 +41,27 @@ Yielded from `foreach` over a [`JsonObject`](JsonObject.md).
 
 | Member | Description |
 |--------|-------------|
-| `Name` | Unescaped field key as a `string` |
+| `Name` | Field key as a `string`, with escape sequences resolved |
+| `EscapedName` | Field key as a `string`, exactly as written in the JSON text |
+| `EscapedNameSpan` | The same bytes as `EscapedName`, without allocating |
 | `Value` | Field value as a [`JsonValue`](JsonValue.md) — **must be disposed** |
 
 > Dispose `prop.Value` before each iteration step or the native iterator may become invalid.
+
+### Which key to use for a lookup
+
+simdjson compares lookup keys against the **raw bytes in the document**, escape sequences and all. For a key containing an escape, `Name` therefore cannot be passed back to `GetField`, `FindField` or a pointer lookup. `EscapedName` can.
+
+```csharp
+using var doc = parser.Parse("""{"a\"b":42}""");
+
+doc.GetField("a\"b");   // throws: the document holds a\"b, not a"b
+doc.GetField("a\\\"b"); // finds it
+```
+
+For keys with no escapes, which is the overwhelming majority, the two are identical and either works.
+
+`EscapedNameSpan` points into the document buffer, so unlike `Value` it stays valid after the enumerator advances, and remains readable until the document is disposed.
 
 ---
 

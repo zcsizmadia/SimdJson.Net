@@ -91,13 +91,15 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
         {
             while (true)
             {
-                NextField(iter, out string? key, out nint valHandle, out bool done);
+                NextField(iter, out string? key, out nint escapedKey, out int escapedKeyLength,
+                    out nint valHandle, out bool done);
                 if (done)
                 {
                     yield break;
                 }
 
-                yield return new JsonProperty(key!, new JsonValue(valHandle, _owner));
+                yield return new JsonProperty(
+                    key!, new JsonValue(valHandle, _owner), escapedKey, escapedKeyLength);
             }
         }
         finally
@@ -106,15 +108,20 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
         }
     }
 
-    private static unsafe void NextField(nint iter, out string? key, out nint valHandle, out bool done)
+    private static unsafe void NextField(
+        nint iter, out string? key, out nint escapedKey, out int escapedKeyLength,
+        out nint valHandle, out bool done)
     {
         SimdJsonException.ThrowIfError(
             NativeMethods.ObjectIterNext(iter,
                 out byte* keyPtr, out nuint keyLen,
+                out byte* escapedPtr, out nuint escapedLen,
                 out valHandle,
                 out int doneInt));
         done = doneInt != 0;
         key = done ? null : System.Text.Encoding.UTF8.GetString(keyPtr, (int)keyLen);
+        escapedKey = (nint)escapedPtr;
+        escapedKeyLength = (int)escapedLen;
     }
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
@@ -290,11 +297,47 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
 }
 
 /// <summary>A key-value pair from a <see cref="JsonObject"/> iteration.</summary>
-public readonly struct JsonProperty(string name, JsonValue value)
+public readonly struct JsonProperty
 {
-    /// <summary>The field name (unescaped).</summary>
-    public string Name { get; } = name;
+    private readonly nint _escapedName;
+    private readonly int _escapedNameLength;
+
+    internal JsonProperty(string name, JsonValue value, nint escapedName, int escapedNameLength)
+    {
+        Name = name;
+        Value = value;
+        _escapedName = escapedName;
+        _escapedNameLength = escapedNameLength;
+    }
+
+    /// <summary>The field name, with JSON escape sequences resolved.</summary>
+    public string Name { get; }
 
     /// <summary>The field value. Dispose when no longer needed.</summary>
-    public JsonValue Value { get; } = value;
+    public JsonValue Value { get; }
+
+    /// <summary>
+    /// The field name exactly as it appears in the JSON text, with escape sequences left intact,
+    /// as UTF-8 bytes and without the surrounding quotes.
+    /// </summary>
+    /// <remarks>
+    /// This is the form that <see cref="JsonObject.GetField"/>, <see cref="JsonObject.FindField"/>
+    /// and the pointer lookups compare against, so it is what you pass back to look the field up
+    /// again. For a key with no escape sequences it is the same text as <see cref="Name"/>.
+    /// <para>
+    /// The span points into the document buffer and is valid until the owning document is
+    /// disposed. It is not invalidated by advancing the enumerator, unlike <see cref="Value"/>.
+    /// </para>
+    /// </remarks>
+    public unsafe ReadOnlySpan<byte> EscapedNameSpan =>
+        _escapedName == 0 ? default : new ReadOnlySpan<byte>((byte*)_escapedName, _escapedNameLength);
+
+    /// <summary>
+    /// The field name exactly as it appears in the JSON text, with escape sequences left intact.
+    /// Allocates; prefer <see cref="EscapedNameSpan"/> on hot paths.
+    /// </summary>
+    public unsafe string EscapedName =>
+        _escapedName == 0
+            ? Name
+            : System.Text.Encoding.UTF8.GetString((byte*)_escapedName, _escapedNameLength);
 }

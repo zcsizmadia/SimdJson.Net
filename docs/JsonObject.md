@@ -33,7 +33,23 @@ foreach (var prop in obj)
 }
 ```
 
-Each `JsonProperty` exposes `Name` (string) and `Value` (JsonValue). The `Value` **must be disposed** before the next iteration step.
+Each `JsonProperty` exposes `Name` (string), `EscapedName` (string), `EscapedNameSpan` (`ReadOnlySpan<byte>`) and `Value` (JsonValue). The `Value` **must be disposed** before the next iteration step.
+
+`Name` has escape sequences resolved and is what you want for display. `EscapedName` is the key exactly as it appears in the JSON text, and is the form to pass back to `GetField` or `FindField`, because simdjson matches against the document's raw bytes. The two differ only for keys that actually contain escapes. See [Types.md](Types.md#which-key-to-use-for-a-lookup).
+
+```csharp
+// Round-trip a key that contains an escape
+using var obj = doc.GetObject();
+var keys = new List<string>();
+foreach (var prop in obj)
+{
+    keys.Add(prop.EscapedName);
+    prop.Value.Dispose();
+}
+
+doc.Rewind();
+using var again = doc.GetField(keys[0]);
+```
 
 ## Pointer / path lookup
 
