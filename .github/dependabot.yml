@@ -4,3 +4,21 @@ updates:
     directory: "/"
     schedule:
       interval: "weekly"
+
+  - package-ecosystem: "nuget"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    groups:
+      # TUnit and TUnit.Assertions are released in lockstep and share a version in
+      # Directory.Packages.props, so bumping them separately would fail to restore.
+      tunit:
+        patterns:
+          - "TUnit"
+          - "TUnit.*"
+    ignore:
+      # This repository's own package. NupkgValidator references it at the version set in
+      # Directory.Build.props and restores it from the locally built ../nupkgs folder, which
+      # is the whole point of that check. An external bump would break it.
+      - dependency-name: "SimdJson.Net"
