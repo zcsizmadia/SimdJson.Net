@@ -61,6 +61,29 @@ public sealed class SimdJsonParser : IDisposable
         return System.Text.Encoding.UTF8.GetString(p, len);
     }
 
+    /// <summary>
+    /// Returns the name of the SIMD kernel simdjson selected for this machine,
+    /// for example <c>"haswell"</c>, <c>"icelake"</c>, <c>"westmere"</c>, <c>"arm64"</c>
+    /// or <c>"fallback"</c>.
+    /// </summary>
+    /// <remarks>
+    /// simdjson dispatches at runtime based on the CPU it finds. This is the value to quote
+    /// in a bug report about unexpected performance or platform-specific behaviour. A result
+    /// of <c>"fallback"</c> means no SIMD kernel matched and the scalar implementation is in use.
+    /// </remarks>
+    public static unsafe string ActiveImplementation
+    {
+        get
+        {
+            // Kernel names are short; one stack buffer covers every implementation simdjson ships.
+            const int bufferSize = 64;
+            byte* buffer = stackalloc byte[bufferSize];
+            SimdJsonException.ThrowIfError(
+                NativeMethods.ActiveImplementation(buffer, bufferSize, out nuint len));
+            return Encoding.UTF8.GetString(buffer, (int)len);
+        }
+    }
+
     /// <summary>Creates a new parser instance.</summary>
     public SimdJsonParser()
     {

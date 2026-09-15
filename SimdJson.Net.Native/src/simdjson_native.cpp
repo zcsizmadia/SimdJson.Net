@@ -50,8 +50,26 @@ static SimdJsonError translate_error(simdjson::error_code ec) noexcept {
         case OUT_OF_CAPACITY:            return SIMDJSON_BRIDGE_ERR_MEMORY;
         case DEPTH_ERROR:                return SIMDJSON_BRIDGE_ERR_DEPTH;
         case TRAILING_CONTENT:           return SIMDJSON_BRIDGE_ERR_TRAILING_CONTENT;
-        default:                         return SIMDJSON_BRIDGE_ERR_UNKNOWN;
+        default:
+            // No dedicated bridge code. Rather than collapsing every remaining error to a
+            // single opaque value, encode the simdjson code so the caller can recover
+            // simdjson's own message via SimdJsonNative_ErrorMessage.
+            if (ec > SUCCESS && ec < NUM_ERROR_CODES) {
+                return SIMDJSON_BRIDGE_ERR_UNKNOWN_BASE - static_cast<SimdJsonError>(ec);
+            }
+            return SIMDJSON_BRIDGE_ERR_UNKNOWN;
     }
+}
+
+// Recovers the simdjson error code from a bridge code produced by translate_error,
+// or NUM_ERROR_CODES if the bridge code does not carry one.
+static simdjson::error_code decode_error(SimdJsonError bridge_code) noexcept {
+    if (bridge_code > SIMDJSON_BRIDGE_ERR_UNKNOWN_BASE) { return simdjson::NUM_ERROR_CODES; }
+    const SimdJsonError raw = SIMDJSON_BRIDGE_ERR_UNKNOWN_BASE - bridge_code;
+    if (raw <= simdjson::SUCCESS || raw >= simdjson::NUM_ERROR_CODES) {
+        return simdjson::NUM_ERROR_CODES;
+    }
+    return static_cast<simdjson::error_code>(raw);
 }
 
 // raw_json_token() spans up to the next structural character, so scalar tokens carry any
@@ -114,6 +132,45 @@ struct BridgeObjectIter {
 
 extern "C" const char* SJNATIVE_CALL SimdJsonNative_GetVersion(void) {
     return SIMDJSON_VERSION;
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ActiveImplementation(
+    char* buffer, size_t buffer_len, size_t* out_len)
+{
+    CHECK_NULL(out_len);
+    try {
+        // implementation::name() returns std::string by value, so the bytes must be copied
+        // into the caller's buffer rather than handed out as a pointer.
+        // atomic_ptr exposes the pointer through its conversion operator, not a load() method.
+        const simdjson::implementation* impl = simdjson::get_active_implementation();
+        if (!impl) return SIMDJSON_BRIDGE_ERR_UNKNOWN;
+        const std::string name = impl->name();
+        *out_len = name.size();
+        if (!buffer) return SIMDJSON_BRIDGE_SUCCESS;          // size query
+        if (buffer_len < name.size()) return SIMDJSON_BRIDGE_ERR_CAPACITY;
+        std::memcpy(buffer, name.data(), name.size());
+        return SIMDJSON_BRIDGE_SUCCESS;
+    } catch (...) {
+        return SIMDJSON_BRIDGE_ERR_UNKNOWN;
+    }
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ErrorMessage(
+    SimdJsonError bridge_code, const char** out_ptr, size_t* out_len)
+{
+    CHECK_NULL(out_ptr);
+    CHECK_NULL(out_len);
+    const auto ec = decode_error(bridge_code);
+    if (ec == simdjson::NUM_ERROR_CODES) {
+        *out_ptr = nullptr;
+        *out_len = 0;
+        return SIMDJSON_BRIDGE_ERR_NO_SUCH_FIELD;
+    }
+    // error_message returns a pointer to a static string table entry.
+    const char* msg = simdjson::error_message(ec);
+    *out_ptr = msg;
+    *out_len = msg ? std::strlen(msg) : 0;
+    return SIMDJSON_BRIDGE_SUCCESS;
 }
 
 // ─── Parser lifecycle ────────────────────────────────────────────────────────

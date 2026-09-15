@@ -57,6 +57,14 @@ typedef int32_t SimdJsonError;
 #define SIMDJSON_BRIDGE_ERR_TRAILING_CONTENT  -13  // TRAILING_CONTENT
 #define SIMDJSON_BRIDGE_ERR_UNKNOWN           -99
 
+/**
+ * simdjson errors without a dedicated bridge code above are returned as
+ * SIMDJSON_BRIDGE_ERR_UNKNOWN_BASE minus the simdjson error code, i.e. -1001 and below.
+ * Pass such a code to SimdJsonNative_ErrorMessage to recover simdjson's own message.
+ * SIMDJSON_BRIDGE_ERR_UNKNOWN is reserved for errors that carry no recoverable code.
+ */
+#define SIMDJSON_BRIDGE_ERR_UNKNOWN_BASE      -1000
+
 // ─── JSON value types ────────────────────────────────────────────────────────
 // Values match simdjson::ondemand::json_type exactly so that static_cast is
 // a no-op and callers can compare against these constants without surprises.
@@ -83,6 +91,28 @@ typedef enum SimdJsonNumberType {
 
 /** Returns the simdjson library version string (e.g. "3.9.0"). */
 SJNATIVE_API const char* SJNATIVE_CALL SimdJsonNative_GetVersion(void);
+
+/**
+ * Copies the name of the SIMD kernel simdjson selected at runtime, such as
+ * "haswell", "icelake", "westmere", "arm64" or "fallback", into `buffer`.
+ *
+ * Pass a NULL buffer to query the required length: *out_len is always set to the
+ * name length. Returns SIMDJSON_BRIDGE_ERR_CAPACITY if the buffer is too small.
+ * The name is not NUL-terminated by this call; use *out_len.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ActiveImplementation(
+    char* buffer, size_t buffer_len, size_t* out_len);
+
+/**
+ * Returns simdjson's own message for a bridge error code that encodes one, that is
+ * any code at or below SIMDJSON_BRIDGE_ERR_UNKNOWN_BASE.
+ *
+ * The returned pointer is a static string owned by simdjson and is valid for the
+ * lifetime of the process. Returns SIMDJSON_BRIDGE_ERR_NO_SUCH_FIELD when the code
+ * carries no simdjson error, in which case *out_ptr is NULL.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ErrorMessage(
+    SimdJsonError bridge_code, const char** out_ptr, size_t* out_len);
 
 // ─── Parser lifecycle ────────────────────────────────────────────────────────
 

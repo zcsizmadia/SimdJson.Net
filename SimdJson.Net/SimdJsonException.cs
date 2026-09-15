@@ -1,3 +1,5 @@
+using SimdJson.Internal;
+
 namespace SimdJson;
 
 /// <summary>Exception thrown when the native simdjson bridge returns an error.</summary>
@@ -45,6 +47,37 @@ public sealed class SimdJsonException : Exception
         -12 => "Maximum JSON nesting depth exceeded.",
         -13 => "Unexpected trailing content after the JSON value.",
         -99 => "Unknown native error.",
-        _   => $"Native error {code}."
+        _   => UpstreamMessage(code) ?? $"Native error {code}."
     };
+
+    /// <summary>
+    /// Returns simdjson's own message for error codes that carry one, or <see langword="null"/>.
+    /// Codes at or below -1000 encode the original simdjson error rather than collapsing to -99.
+    /// </summary>
+    private static unsafe string? UpstreamMessage(int code)
+    {
+        if (code > UpstreamErrorBase)
+        {
+            return null;
+        }
+
+        try
+        {
+            if (NativeMethods.ErrorMessage(code, out byte* ptr, out nuint len) != 0 || ptr is null)
+            {
+                return null;
+            }
+
+            return $"{System.Text.Encoding.UTF8.GetString(ptr, (int)len)} (simdjson error {UpstreamErrorBase - code}).";
+        }
+        catch
+        {
+            // Building an exception message must never itself throw, even if the native
+            // library failed to load.
+            return null;
+        }
+    }
+
+    /// <summary>Bridge codes at or below this value encode a simdjson error code.</summary>
+    private const int UpstreamErrorBase = -1000;
 }

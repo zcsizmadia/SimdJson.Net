@@ -31,6 +31,14 @@ internal static unsafe partial class NativeMethods
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial byte* GetVersion();
 
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ActiveImplementation")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ActiveImplementation(byte* buffer, nuint bufferLen, out nuint outLen);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ErrorMessage")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ErrorMessage(int bridgeCode, out byte* outPtr, out nuint outLen);
+
     // ── Parser lifecycle ──────────────────────────────────────────────────
 
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_CreateParser")]

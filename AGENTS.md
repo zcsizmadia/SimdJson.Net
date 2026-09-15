@@ -236,7 +236,10 @@ Run on a specific TFM: `dotnet test SimdJson.Net.Tests -f net10.0`
 | `-99` | *(unknown)* | Unrecognised simdjson error |
 
 When adding a bridge function, make sure any new simdjson `error_code` it can return is handled in
-`translate_error`; anything unmapped surfaces as an opaque `-99`.
+`translate_error`. Codes without a dedicated mapping are encoded as `-1000` minus the simdjson code,
+so `SimdJsonException.Message` can recover simdjson's own text through `SimdJsonNative_ErrorMessage`.
+Prefer adding a real mapping for anything a caller might reasonably branch on: the encoded range is
+diagnostic output, not API.
 
 ---
 
