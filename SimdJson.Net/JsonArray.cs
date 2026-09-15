@@ -203,14 +203,14 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
     public bool TryAtPointer(string pointer, out JsonValue? value)
     {
         try { value = AtPointer(pointer); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>Tries to get a value via a JSONPath expression.</summary>
     public bool TryAtPath(string jsonPath, out JsonValue? value)
     {
         try { value = AtPath(jsonPath); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>

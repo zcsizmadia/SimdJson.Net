@@ -31,6 +31,32 @@ public sealed class SimdJsonException : Exception
     internal static void Throw(int code) =>
         throw new SimdJsonException(code, GetMessage(code));
 
+    // ── Classification used by the non-throwing TryXxx helpers ────────────────
+    //
+    // A TryXxx method should report "the thing you asked for is not here" and nothing
+    // else. Absorbing every error would also hide caller mistakes such as out-of-order
+    // iteration, and document-level problems such as malformed JSON, behind a bare
+    // false. Those propagate instead.
+
+    /// <summary>
+    /// The lookup found nothing: no such field, index past the end, or a pointer that
+    /// does not resolve.
+    /// </summary>
+    internal static bool IsLookupMiss(int code) => code is -3 or -4 or -8;
+
+    /// <summary>
+    /// The value is not of the requested type, or does not fit it. Used by the typed
+    /// getters, where answering "no" is the entire purpose of the call.
+    /// </summary>
+    internal static bool IsTypeMismatch(int code) => code is -2 or -9 or -10;
+
+    /// <summary>
+    /// As <see cref="IsTypeMismatch"/>, plus a number that does not parse. Used by the
+    /// number-in-string getters, where the string's contents not being numeric is an
+    /// expected answer rather than a broken document.
+    /// </summary>
+    internal static bool IsValueMismatch(int code) => IsTypeMismatch(code) || code is -6;
+
     private static string GetMessage(int code) => code switch
     {
         -1  => "Parser capacity exceeded.",

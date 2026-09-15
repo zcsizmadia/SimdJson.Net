@@ -208,70 +208,70 @@ public sealed class JsonValue : IDisposable
     public bool TryGetString(out string value)
     {
         try { value = GetString(); return true; }
-        catch (SimdJsonException) { value = null!; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = null!; return false; }
     }
 
     /// <summary>Tries to get the value as a <see cref="long"/>. Returns <see langword="false"/> if the value is not an integer.</summary>
     public bool TryGetInt64(out long value)
     {
         try { value = GetInt64(); return true; }
-        catch (SimdJsonException) { value = default; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = default; return false; }
     }
 
     /// <summary>Tries to get the value as a <see cref="double"/>. Returns <see langword="false"/> if the value is not a number.</summary>
     public bool TryGetDouble(out double value)
     {
         try { value = GetDouble(); return true; }
-        catch (SimdJsonException) { value = default; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = default; return false; }
     }
 
     /// <summary>Tries to get the value as a <see cref="float"/>. Returns <see langword="false"/> if the value is not a number.</summary>
     public bool TryGetFloat(out float value)
     {
         try { value = GetFloat(); return true; }
-        catch (SimdJsonException) { value = default; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = default; return false; }
     }
 
     /// <summary>Tries to get the value as a <see cref="bool"/>. Returns <see langword="false"/> if the value is not a boolean.</summary>
     public bool TryGetBool(out bool value)
     {
         try { value = GetBool(); return true; }
-        catch (SimdJsonException) { value = default; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = default; return false; }
     }
 
     /// <summary>Tries to get the value as an <see cref="int"/>. Returns <see langword="false"/> if the value is not an integer or overflows.</summary>
     public bool TryGetInt32(out int value)
     {
         try { value = GetInt32(); return true; }
-        catch (SimdJsonException) { value = default; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = default; return false; }
     }
 
     /// <summary>Tries to get the value as a <see cref="uint"/>. Returns <see langword="false"/> if the value is not an integer or overflows.</summary>
     public bool TryGetUInt32(out uint value)
     {
         try { value = GetUInt32(); return true; }
-        catch (SimdJsonException) { value = default; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = default; return false; }
     }
 
     /// <summary>Tries to get the value as a <see cref="ulong"/>. Returns <see langword="false"/> if the value is not an unsigned integer.</summary>
     public bool TryGetUInt64(out ulong value)
     {
         try { value = GetUInt64(); return true; }
-        catch (SimdJsonException) { value = default; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = default; return false; }
     }
 
     /// <summary>Tries to get the value as a <see cref="JsonArray"/>. Returns <see langword="false"/> if the value is not an array.</summary>
     public bool TryGetArray(out JsonArray? value)
     {
         try { value = GetArray(); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>Tries to get the value as a <see cref="JsonObject"/>. Returns <see langword="false"/> if the value is not an object.</summary>
     public bool TryGetObject(out JsonObject? value)
     {
         try { value = GetObject(); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>Gets a child field by key. Throws if this value is not an object.</summary>
@@ -402,21 +402,21 @@ public sealed class JsonValue : IDisposable
     public bool TryGetDoubleInString(out double value)
     {
         try { value = GetDoubleInString(); return true; }
-        catch (SimdJsonException) { value = default; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsValueMismatch(ex.ErrorCode)) { value = default; return false; }
     }
 
     /// <summary>Tries to parse an <see cref="long"/> from a JSON string value.</summary>
     public bool TryGetInt64InString(out long value)
     {
         try { value = GetInt64InString(); return true; }
-        catch (SimdJsonException) { value = default; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsValueMismatch(ex.ErrorCode)) { value = default; return false; }
     }
 
     /// <summary>Tries to parse a <see cref="ulong"/> from a JSON string value.</summary>
     public bool TryGetUInt64InString(out ulong value)
     {
         try { value = GetUInt64InString(); return true; }
-        catch (SimdJsonException) { value = default; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsValueMismatch(ex.ErrorCode)) { value = default; return false; }
     }
 
     // ── JSON Pointer and JSONPath ──────────────────────────────────────────────
@@ -479,7 +479,7 @@ public sealed class JsonValue : IDisposable
     public bool TryFindFieldUnordered(string key, out JsonValue? value)
     {
         try { value = FindFieldUnordered(key); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>
@@ -505,14 +505,14 @@ public sealed class JsonValue : IDisposable
     public bool TryAtPointer(string pointer, out JsonValue? value)
     {
         try { value = AtPointer(pointer); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>Tries to get a descendant value via a JSONPath expression.</summary>
     public bool TryAtPath(string jsonPath, out JsonValue? value)
     {
         try { value = AtPath(jsonPath); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     // ── Type predicates ───────────────────────────────────────────────────────

@@ -72,14 +72,14 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     public bool TryGetField(string key, out JsonValue? value)
     {
         try { value = GetField(key); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>Returns <see langword="true"/> if a field with the given key exists.</summary>
     public bool ContainsKey(string key)
     {
         try { using var v = GetField(key); return true; }
-        catch (SimdJsonException) { return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { return false; }
     }
 
     /// <summary>Iterates over all key-value pairs.</summary>
@@ -204,7 +204,7 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     public bool TryFindFieldUnordered(string key, out JsonValue? value)
     {
         try { value = FindFieldUnordered(key); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>
@@ -244,14 +244,14 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
     public bool TryAtPointer(string pointer, out JsonValue? value)
     {
         try { value = AtPointer(pointer); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>Tries to get a value via a JSONPath expression.</summary>
     public bool TryAtPath(string jsonPath, out JsonValue? value)
     {
         try { value = AtPath(jsonPath); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>
