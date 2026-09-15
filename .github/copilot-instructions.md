@@ -9,9 +9,9 @@ C++ (simdjson On-Demand) → C ABI bridge (SimdJsonNative.dll) → C# P/Invoke �
 ```
 
 - **`SimdJson.Net.Native/`** — CMake project that compiles `SimdJsonNative.dll/.so/.dylib` from source via `FetchContent`. The output name is always `SimdJsonNative` regardless of folder name.
-- **`SimdJson.Net/`** — The .NET library. `Internal/NativeMethods.cs` holds `[LibraryImport]` P/Invokes. `Internal/NativeLoader.cs` resolves the native DLL at runtime.
+- **`SimdJson.Net/`** — The .NET library. `Internal/NativeMethods.cs` holds `[LibraryImport]` P/Invokes. `Internal/NativeLoader.cs` resolves the native DLL at runtime. `NdjsonParser`, `NdjsonParserOptions` and `JsonDocumentStream` cover NDJSON, both stream-based and in-memory batching — do not hand-roll line splitting.
 - **`SimdJson.Net.Tests/`** — TUnit test project. **Do not use xUnit or NUnit.**
-- **`Samples/`** — 10 standalone `net10.0` console apps (one per API area).
+- **`Samples/`** — 13 standalone console apps (one per API area).
 - **`docs/`** — Per-type API reference. `docs/API.md` is the index.
 
 ## Build requirement
@@ -30,7 +30,7 @@ These are hard constraints from the underlying C++ library — violating them ca
 
 1. **Forward-only**: the document iterator moves in one direction. Use `GetField`/`this[key]` (order-insensitive) not `FindField` (order-sensitive) unless you know the exact field order.
 2. **Fully consume nested containers before accessing siblings**: if you open a nested `JsonObject` or `JsonArray`, you must read **all** its content before accessing the next sibling field of the parent. Dispose the nested handles before moving on.
-3. **One document per parser at a time**: parsing a second document on the same `SimdJsonParser` instance invalidates the first document.
+3. **One document per parser at a time**: parsing again while a document from that parser is still undisposed throws `InvalidOperationException`. Dispose the document first, or use a second parser instance.
 4. **`SimdJsonParser.Shared` is thread-local**: safe across threads but still subject to rule 3 — don't hold a document and call `Shared.Parse` again on the same thread.
 
 ## Dispose everything
@@ -40,10 +40,10 @@ These are hard constraints from the underlying C++ library — violating them ca
 ## Adding a new API function
 
 1. **C++ (`SimdJson.Net.Native/src/simdjson_native.cpp`)**: implement the function; follow the existing `BridgeDocument`/`BridgeValue`/`BridgeArray`/`BridgeObject` pattern; return a `SimdJsonError` int.
-2. **Header (`SimdJson.Net.Native/include/simdjson_native.h`)**: declare with `SIMDJSONNATIVE_API` and `__cdecl`.
+2. **Header (`SimdJson.Net.Native/include/simdjson_native.h`)**: declare with `SJNATIVE_API` and `SJNATIVE_CALL`.
 3. **P/Invoke (`SimdJson.Net/Internal/NativeMethods.cs`)**: add a `[LibraryImport]` binding; entry point naming is `SimdJsonNative_<FunctionName>`.
 4. **C# wrapper**: expose through the appropriate class (`JsonValue`, `JsonObject`, etc.) calling `SimdJsonException.ThrowIfError(...)`.
-5. **Test**: add a `[Test]` method in `SimdJson.Net.Tests/SimdJsonTests.cs` using TUnit assertions (`await Assert.That(...)`).
+5. **Test**: add a `[Test]` method to the matching topic file in `SimdJson.Net.Tests/` (for example `ValueTests.cs`, `NdjsonParserTests.cs`) using TUnit assertions (`await Assert.That(...)`).
 
 ## Test framework: TUnit
 

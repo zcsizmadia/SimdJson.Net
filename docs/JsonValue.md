@@ -43,6 +43,8 @@ Represents a JSON value at a specific position in an On-Demand document. Can be 
 |--------|-------------|
 | `GetField(string)` / `this[string]` | Field by name — order-insensitive |
 | `FindField(string)` | Order-sensitive forward-search field lookup |
+| `FindFieldUnordered(string)` | Order-insensitive lookup; may rewind |
+| `TryFindFieldUnordered(string, out JsonValue?)` | Non-throwing `FindFieldUnordered` |
 | `AtPointer(string)` | JSON Pointer from this value |
 | `AtPath(string)` | JSONPath from this value |
 | `TryAtPointer(string, out JsonValue?)` | Non-throwing `AtPointer` |
@@ -74,6 +76,34 @@ For JSON APIs that encode numbers as quoted strings (e.g. `"price": "9.99"`).
 
 ## Raw JSON & diagnostics
 
+| Member | Description |
+|--------|-------------|
+| `GetRawJsonToken()` | Raw token text as a `string` (includes quotes for strings) |
+| `GetRawJsonTokenSpan()` | Raw token as `ReadOnlySpan<byte>` — zero allocation |
+| `GetRawJson()` | Full raw JSON including nested objects/arrays |
+| `GetRawJsonString()` | Raw escaped bytes of a string value as a `string`, no surrounding quotes |
+| `GetRawJsonStringSpan()` | Same as above as `ReadOnlySpan<byte>` — zero allocation |
+| `GetWobblyStringSpan()` | String as WTF-8 bytes (allows lone surrogates) |
+| `CurrentOffset(JsonDocument)` | Byte offset of current parse position in the document |
+| `CurrentDepth()` | Current JSON nesting depth (`0` = root level) |
+
+## Non-throwing getters
+
+Each returns `false` instead of throwing when the value is not of the requested type. They do **not** absorb unrelated failures; see [Types.md](Types.md#what-false-means-and-what-it-does-not) for exactly which error codes are treated as "no".
+
+| Member | Description |
+|--------|-------------|
+| `TryGetString(out string)` | Non-throwing `GetString` |
+| `TryGetInt64(out long)` | Non-throwing `GetInt64` |
+| `TryGetUInt64(out ulong)` | Non-throwing `GetUInt64` |
+| `TryGetInt32(out int)` | Non-throwing `GetInt32`; also `false` on overflow |
+| `TryGetUInt32(out uint)` | Non-throwing `GetUInt32`; also `false` on overflow |
+| `TryGetDouble(out double)` | Non-throwing `GetDouble` |
+| `TryGetFloat(out float)` | Non-throwing `GetFloat` |
+| `TryGetBool(out bool)` | Non-throwing `GetBool` |
+| `TryGetArray(out JsonArray?)` | Non-throwing `GetArray` |
+| `TryGetObject(out JsonObject?)` | Non-throwing `GetObject` |
+
 ## Counting
 
 | Member | Description |
@@ -86,17 +116,6 @@ For JSON APIs that encode numbers as quoted strings (e.g. `"price": "9.99"`).
 | Member | Description |
 |--------|-------------|
 | `ForEachAtPath(string path, Action<JsonValue> callback)` | Invoke `callback` for each value matching a JSONPath wildcard expression (e.g. `"$[*]"`, `"$.items[*].name"`, `"$.*"`) starting from this value (must be an array or object). The `JsonValue` passed to the callback is **borrowed** — valid only during the callback, must not be disposed or stored. |
-
-| Member | Description |
-|--------|-------------|
-| `GetRawJsonToken()` | Raw token text as a `string` (includes quotes for strings) |
-| `GetRawJsonTokenSpan()` | Raw token as `ReadOnlySpan<byte>` — zero allocation |
-| `GetRawJson()` | Full raw JSON including nested objects/arrays |
-| `GetRawJsonString()` | Raw escaped bytes of a string value as a `string`, no surrounding quotes |
-| `GetRawJsonStringSpan()` | Same as above as `ReadOnlySpan<byte>` — zero allocation |
-| `GetWobblyStringSpan()` | String as WTF-8 bytes (allows lone surrogates) |
-| `CurrentOffset(JsonDocument)` | Byte offset of current parse position in the document |
-| `CurrentDepth(JsonDocument)` | Current JSON nesting depth (`0` = root level) |
 
 ## Examples
 

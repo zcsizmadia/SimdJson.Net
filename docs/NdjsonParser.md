@@ -18,8 +18,8 @@ NDJSON (also known as JSON Lines) is a format where each line of a text stream i
 
 | Method | Description |
 |--------|-------------|
-| `Parse` | Projects every document, returning results in order |
-| `OpenStream` | Returns a [`JsonDocumentStream`](#jsondocumentstream) for manual iteration |
+| `Parse<T>(ReadOnlySpan<byte>, Func<JsonDocument, T>, NdjsonParserOptions?)` | Projects every document, returning results in order |
+| `OpenStream(ReadOnlySpan<byte>, NdjsonParserOptions?)` | Returns a [`JsonDocumentStream`](#jsondocumentstream) for manual iteration |
 
 ### Which family to use
 

@@ -23,7 +23,7 @@ using var doc = SimdJsonParser.Shared.Parse("""{"name":"Alice"}""");
 
 | Member | Description |
 |--------|-------------|
-| `Parse(ReadOnlySpan<byte>)` | Parse UTF-8 bytes directly (zero-copy) |
+| `Parse(ReadOnlySpan<byte>)` | Parse UTF-8 bytes directly, with no transcoding. The bytes are copied into a buffer the document owns; see `ParseInPlace` to avoid that copy |
 | `Parse(string)` | Parse a .NET string (UTF-8 transcoding via stack or `ArrayPool`) |
 | `ParseAllowIncompleteJson(ReadOnlySpan<byte>)` | Parse a potentially truncated UTF-8 document (experimental) |
 | `ParseAllowIncompleteJson(string)` | Parse a potentially truncated string (experimental) |
@@ -85,6 +85,10 @@ parser.Allocate(capacity: 4 * 1024 * 1024, maxDepth: 64);
 |--------|-------------|
 | `GetVersion()` | Returns the simdjson version string (e.g. `"4.6.11"`) |
 | `ActiveImplementation` | Name of the SIMD kernel selected for this machine |
+| `Minify(string)` | Remove all insignificant whitespace; returns a `string` |
+| `MinifyUtf8(ReadOnlySpan<byte>)` | Minify UTF-8 JSON bytes; returns `byte[]` |
+| `ValidateUtf8(ReadOnlySpan<byte>)` | Returns `true` if the bytes are valid UTF-8 |
+| `ValidateUtf8(string)` | UTF-8 validation for a .NET string |
 
 ### `ActiveImplementation`
 
@@ -95,10 +99,6 @@ Quote it in bug reports about unexpected performance or platform-specific result
 ```csharp
 Console.WriteLine(SimdJsonParser.ActiveImplementation); // e.g. "haswell"
 ```
-| `Minify(string)` | Remove all insignificant whitespace; returns a `string` |
-| `MinifyUtf8(ReadOnlySpan<byte>)` | Minify UTF-8 JSON bytes; returns `byte[]` |
-| `ValidateUtf8(ReadOnlySpan<byte>)` | Returns `true` if the bytes are valid UTF-8 |
-| `ValidateUtf8(string)` | UTF-8 validation for a .NET string |
 
 ## Examples
 
