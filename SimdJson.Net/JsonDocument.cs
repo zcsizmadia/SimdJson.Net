@@ -91,7 +91,7 @@ public sealed class JsonDocument : IDisposable
     public bool TryGetField(string key, out JsonValue? value)
     {
         try { value = GetField(key); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>
@@ -101,7 +101,7 @@ public sealed class JsonDocument : IDisposable
     public bool TryAtPointer(string pointer, out JsonValue? value)
     {
         try { value = AtPointer(pointer); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>Gets a value via a JSONPath expression (e.g. <c>"$.items[0].name"</c>).</summary>
@@ -123,7 +123,7 @@ public sealed class JsonDocument : IDisposable
     public bool TryAtPath(string jsonPath, out JsonValue? value)
     {
         try { value = AtPath(jsonPath); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>
@@ -167,7 +167,7 @@ public sealed class JsonDocument : IDisposable
     public bool TryFindFieldUnordered(string key, out JsonValue? value)
     {
         try { value = FindFieldUnordered(key); return true; }
-        catch (SimdJsonException) { value = null; return false; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsLookupMiss(ex.ErrorCode)) { value = null; return false; }
     }
 
     /// <summary>

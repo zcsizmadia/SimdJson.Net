@@ -109,6 +109,20 @@ if (doc.TryAtPointer("/config/timeout", out var t))
 }
 ```
 
+#### What `false` means, and what it does not
+
+A `TryXxx` method answers one question. It does not swallow unrelated failures, so a `false` result is always meaningful rather than a catch-all.
+
+| Method group | Returns `false` for | Everything else |
+|--------------|---------------------|-----------------|
+| `TryGetField`, `TryFindFieldUnordered`, `TryAtPointer`, `TryAtPath`, `ContainsKey` | `-3` no such field, `-4` index out of bounds, `-8` malformed pointer | throws |
+| `TryGetString`, `TryGetInt64`, `TryGetArray` and the other typed getters | `-2` wrong type, `-9` scalar document as container, `-10` number out of range | throws |
+| `TryGetInt64InString` and the other number-in-string getters | the above, plus `-6` when the string's contents are not a number | throws |
+
+So a malformed document, a capacity or depth limit, or asking an array for a field by name all raise `SimdJsonException` even through a `Try` call. Those are not absences; reporting them as one would hide the real problem at the point where it is cheapest to find.
+
+Out-of-order iteration, `-7`, would also propagate, but note that simdjson only detects it in builds with development checks enabled, which is not the case for the binaries this package ships.
+
 ---
 
 ← [API Reference](API.md)
