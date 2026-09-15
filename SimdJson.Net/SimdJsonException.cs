@@ -72,6 +72,7 @@ public sealed class SimdJsonException : Exception
         -11 => "Native memory allocation failed.",
         -12 => "Maximum JSON nesting depth exceeded.",
         -13 => "Unexpected trailing content after the JSON value.",
+        -14 => "The buffer does not have enough padding after the JSON.",
         -99 => "Unknown native error.",
         _   => UpstreamMessage(code) ?? $"Native error {code}."
     };

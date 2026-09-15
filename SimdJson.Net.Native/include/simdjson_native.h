@@ -55,6 +55,7 @@ typedef int32_t SimdJsonError;
 #define SIMDJSON_BRIDGE_ERR_MEMORY            -11  // MEMALLOC / OUT_OF_CAPACITY
 #define SIMDJSON_BRIDGE_ERR_DEPTH             -12  // DEPTH_ERROR
 #define SIMDJSON_BRIDGE_ERR_TRAILING_CONTENT  -13  // TRAILING_CONTENT
+#define SIMDJSON_BRIDGE_ERR_INSUFFICIENT_PADDING -14 // INSUFFICIENT_PADDING
 #define SIMDJSON_BRIDGE_ERR_UNKNOWN           -99
 
 /**
@@ -142,6 +143,29 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_Parse(
     SimdJsonParser parser,
     const char*    json,
     size_t         length,
+    SimdJsonDocument* out_doc);
+
+/** Returns SIMDJSON_PADDING: the readable slack a ParseInPlace buffer must have past the JSON. */
+SJNATIVE_API size_t SJNATIVE_CALL SimdJsonNative_GetPadding(void);
+
+/**
+ * Parses without copying the input.
+ *
+ * Unlike SimdJsonNative_Parse, the document borrows the caller's buffer. The caller must keep
+ * it alive, pinned and unmodified until the document is destroyed.
+ *
+ * @param json     Pointer to the UTF-8 JSON text.
+ * @param length   Byte length of the JSON text.
+ * @param capacity Total readable bytes at `json`. Must be at least
+ *                 length + SimdJsonNative_GetPadding(); the padding bytes are read but
+ *                 their contents are ignored.
+ * @return SIMDJSON_BRIDGE_ERR_INSUFFICIENT_PADDING if the buffer lacks that slack.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseInPlace(
+    SimdJsonParser parser,
+    const char*    json,
+    size_t         length,
+    size_t         capacity,
     SimdJsonDocument* out_doc);
 
 /** Destroys a document returned by SimdJsonNative_Parse. */

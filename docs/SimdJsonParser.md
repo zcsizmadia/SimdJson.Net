@@ -41,6 +41,33 @@ All `Parse` methods return a `JsonDocument` that **must be disposed**.
 | `MaxDepth` | Maximum JSON nesting depth the parser supports; set it with `Allocate` |
 | `Allocate(nuint capacity, nuint maxDepth = 1024)` | Pre-allocates buffers for a document size and nesting depth |
 
+### `ParseInPlace`
+
+`Parse` copies the input into memory the document owns, so the caller's buffer is free the moment the call returns. `ParseInPlace` skips that copy and reads straight out of your buffer.
+
+| Member | Description |
+|--------|-------------|
+| `ParseInPlace(ReadOnlyMemory<byte> buffer, int jsonLength)` | Parse without copying; the document borrows the buffer |
+| `RequiredPadding` | Readable bytes the buffer must have past the JSON |
+
+The buffer must be at least `jsonLength + RequiredPadding` bytes. simdjson reads into that slack, though the contents are ignored. Undersized buffers are rejected with `ArgumentOutOfRangeException` before any native call.
+
+```csharp
+byte[] rented = ArrayPool<byte>.Shared.Rent(jsonLength + SimdJsonParser.RequiredPadding);
+try
+{
+    ReadIntoBuffer(rented, jsonLength);
+    using var doc = parser.ParseInPlace(rented, jsonLength);
+    // ... read the document here ...
+}
+finally
+{
+    ArrayPool<byte>.Shared.Return(rented); // only after the document is disposed
+}
+```
+
+**The buffer must stay unchanged until the document is disposed.** It is pinned for that whole time. Writing to it, returning it to a pool, or reusing it while the document is alive produces wrong answers rather than an exception, because the document is still reading those bytes. That is a real trade: prefer `Parse` unless a profile shows the copy matters.
+
 ### `Allocate`
 
 Calling `Allocate` up front avoids the reallocation that the first large parse would otherwise trigger, which is worth doing when you know the working document size in advance.

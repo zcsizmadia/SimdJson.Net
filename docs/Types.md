@@ -84,6 +84,7 @@ Thrown on any native bridge error. `Message` contains a human-readable descripti
 | `-11` | Native memory allocation failed |
 | `-12` | Maximum JSON nesting depth exceeded |
 | `-13` | Unexpected trailing content after the JSON value |
+| `-14` | Buffer lacks the padding `ParseInPlace` requires |
 | `-99` | Unknown native error carrying no recoverable detail |
 | `-1001` and below | A simdjson error with no dedicated code above; see below |
 

@@ -59,6 +59,15 @@ internal static unsafe partial class NativeMethods
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial void DestroyDocument(nint doc);
 
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_GetPadding")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial nuint GetPadding();
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ParseInPlace")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ParseInPlace(
+        nint parser, byte* json, nuint length, nuint capacity, out nint outDoc);
+
     // ── Document root access ──────────────────────────────────────────────
 
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetType")]

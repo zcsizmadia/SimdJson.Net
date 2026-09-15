@@ -31,6 +31,7 @@ For patterns, pitfalls, and detailed rules see [Design Notes](DesignNotes.md).
 ```csharp
 using var doc = SimdJsonParser.Shared.Parse("""{"x":1}""");
 using var doc = SimdJsonParser.Shared.Parse(utf8Span);
+using var doc = parser.ParseInPlace(paddedBuffer, jsonLength); // zero-copy
 using var doc = await parser.ParseAsync(stream, ct);
 ```
 

@@ -16,9 +16,18 @@ public unsafe class ParseOnlyBenchmarks
     public JsonSize Size { get; set; }
 
     private byte[] _data = null!;
+    private byte[] _paddedData = null!;
 
     [GlobalSetup]
-    public void Setup() => _data = JsonDataGenerator.Generate(Size);
+    public void Setup()
+    {
+        _data = JsonDataGenerator.Generate(Size);
+
+        // ParseInPlace needs readable slack past the JSON; the copy it avoids is what
+        // this pair of benchmarks measures.
+        _paddedData = new byte[_data.Length + SimdJsonParser.RequiredPadding];
+        _data.CopyTo(_paddedData, 0);
+    }
 
     // ── System.Text.Json ────────────────────────────────────────────────────
 
@@ -37,6 +46,16 @@ public unsafe class ParseOnlyBenchmarks
     public void SimdJsonNet()
     {
         using var doc = SimdJsonParser.Shared.Parse(_data);
+        _ = doc.ValueKind;
+    }
+
+    // ── SimdJson.Net, zero-copy ─────────────────────────────────────────────
+
+    [BenchmarkCategory("ParseOnly")]
+    [Benchmark(Description = "SimdJson.Net (in place)")]
+    public void SimdJsonNetInPlace()
+    {
+        using var doc = SimdJsonParser.Shared.ParseInPlace(_paddedData, _data.Length);
         _ = doc.ValueKind;
     }
 
