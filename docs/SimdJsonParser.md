@@ -57,6 +57,17 @@ parser.Allocate(capacity: 4 * 1024 * 1024, maxDepth: 64);
 | Member | Description |
 |--------|-------------|
 | `GetVersion()` | Returns the simdjson version string (e.g. `"4.6.11"`) |
+| `ActiveImplementation` | Name of the SIMD kernel selected for this machine |
+
+### `ActiveImplementation`
+
+simdjson picks a kernel at runtime from the CPU it detects, so the same binary behaves differently on different hardware. This property reports which one is in use, for example `haswell`, `icelake`, `westmere`, `arm64` or `fallback`.
+
+Quote it in bug reports about unexpected performance or platform-specific results. A value of `fallback` means no SIMD kernel matched and the scalar path is running, which is the usual explanation for disappointing throughput.
+
+```csharp
+Console.WriteLine(SimdJsonParser.ActiveImplementation); // e.g. "haswell"
+```
 | `Minify(string)` | Remove all insignificant whitespace; returns a `string` |
 | `MinifyUtf8(ReadOnlySpan<byte>)` | Minify UTF-8 JSON bytes; returns `byte[]` |
 | `ValidateUtf8(ReadOnlySpan<byte>)` | Returns `true` if the bytes are valid UTF-8 |

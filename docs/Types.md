@@ -67,7 +67,18 @@ Thrown on any native bridge error. `Message` contains a human-readable descripti
 | `-11` | Native memory allocation failed |
 | `-12` | Maximum JSON nesting depth exceeded |
 | `-13` | Unexpected trailing content after the JSON value |
-| `-99` | Unknown native error |
+| `-99` | Unknown native error carrying no recoverable detail |
+| `-1001` and below | A simdjson error with no dedicated code above; see below |
+
+### simdjson errors without a dedicated code
+
+simdjson defines more error conditions than the table above. Rather than collapsing all of them to `-99`, the bridge encodes the original error as `-1000` minus the simdjson code, and `Message` carries simdjson's own text plus the underlying number.
+
+```
+Unsupported architecture (simdjson error 21).
+```
+
+These codes are stable for a given simdjson version but are not part of this package's API surface, because upstream may renumber them. Match on the documented codes above; treat the encoded range as diagnostic detail for logs and bug reports.
 
 ### Catching errors
 
