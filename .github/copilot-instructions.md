@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v4.6.3 exposing the **On-Demand** API. Architecture:
+A .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v4.6.11 exposing the **On-Demand** API. Architecture:
 
 ```
 C++ (simdjson On-Demand) → C ABI bridge (SimdJsonNative.dll) → C# P/Invoke → public API

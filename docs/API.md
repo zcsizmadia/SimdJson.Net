@@ -80,7 +80,7 @@ JsonNumber n = val.GetNumber();
 ### Utilities
 
 ```csharp
-SimdJsonParser.GetVersion();           // "4.6.3"
+SimdJsonParser.GetVersion();           // "4.6.11"
 SimdJsonParser.Minify(json);
 SimdJsonParser.ValidateUtf8(bytes);
 ```

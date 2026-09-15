@@ -1,6 +1,6 @@
 <Project>
   <PropertyGroup>
-    <SimdJsonVersion>4.6.3</SimdJsonVersion>
+    <SimdJsonVersion>4.6.11</SimdJsonVersion>
     <Version>$(SimdJsonVersion).1</Version>
   </PropertyGroup>
 

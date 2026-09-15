@@ -27,7 +27,7 @@ public sealed class SimdJsonParser : IDisposable
     public static SimdJsonParser Shared => _shared ??= new SimdJsonParser();
 
     /// <summary>
-    /// Returns the simdjson library version string (e.g. <c>"4.6.3"</c>).
+    /// Returns the simdjson library version string (e.g. <c>"4.6.11"</c>).
     /// </summary>
     public static unsafe string GetVersion()
     {

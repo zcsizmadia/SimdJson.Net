@@ -6,7 +6,7 @@ Guidance for AI agents (Codex, Claude, Copilot, etc.) working in this repository
 
 ## Project overview
 
-**SimdJson.Net** is a .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v4.6.3 that exposes the On-Demand streaming JSON parser.
+**SimdJson.Net** is a .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v4.6.11 that exposes the On-Demand streaming JSON parser.
 
 ```
 simdjson (C++, FetchContent) ──► SimdJsonNative.dll  (C ABI bridge, CMake)
