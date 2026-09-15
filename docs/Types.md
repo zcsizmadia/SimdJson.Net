@@ -63,6 +63,10 @@ Thrown on any native bridge error. `Message` contains a human-readable descripti
 | `-7` | Iteration error (forward-only constraint violated) |
 | `-8` | Invalid JSON Pointer syntax |
 | `-9` | Scalar document used as a container |
+| `-10` | Number out of range (does not fit in 64 bits, or in the requested type) |
+| `-11` | Native memory allocation failed |
+| `-12` | Maximum JSON nesting depth exceeded |
+| `-13` | Unexpected trailing content after the JSON value |
 | `-99` | Unknown native error |
 
 ### Catching errors

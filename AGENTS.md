@@ -6,7 +6,7 @@ Guidance for AI agents (Codex, Claude, Copilot, etc.) working in this repository
 
 ## Project overview
 
-**SimdJson.Net** is a .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v4.6.3 that exposes the On-Demand streaming JSON parser.
+**SimdJson.Net** is a .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v4.6.11 that exposes the On-Demand streaming JSON parser.
 
 ```
 simdjson (C++, FetchContent) ──► SimdJsonNative.dll  (C ABI bridge, CMake)
@@ -91,8 +91,15 @@ Searches for `SimdJsonNative.{dll,so,dylib}` in:
 |------|--------------------------|
 | Access fields in document order, or use `GetField`/`this[key]` (order-insensitive) | `SimdJsonException` code `-7` (OUT_OF_ORDER_ITERATION) |
 | **Fully consume a nested object/array before accessing the next sibling field** | `SimdJsonException` code `-7` |
-| One live `JsonDocument` per `SimdJsonParser` instance at a time | Stale document contains garbage / crashes |
+| One live `JsonDocument` per `SimdJsonParser` instance at a time | `InvalidOperationException` on the second `Parse` |
 | Dispose `JsonValue`/`JsonArray`/`JsonObject` handles promptly | Native handle leak |
+| Do not use a `JsonValue`/`JsonArray`/`JsonObject` after its document is disposed | `ObjectDisposedException` |
+| Spans from `GetStringSpan`/`GetRawJson*Span` live in the **parser's** buffers | Dangling data after the next `Parse` on that parser |
+
+C++ exceptions must never cross the `extern "C"` boundary: never rely on `simdjson_result`'s implicit
+conversion operator in the bridge (it throws). Always take the value with `.get(out)` and translate the
+error code. The same applies in reverse for the managed wildcard callback, whose exceptions are captured
+and rethrown after the native call returns.
 
 ### The nested-consumption rule — the #1 source of bugs
 
@@ -222,7 +229,14 @@ Run on a specific TFM: `dotnet test SimdJson.Net.Tests -f net10.0`
 | `-7` | `OUT_OF_ORDER_ITERATION` | Forward-only constraint violated |
 | `-8` | `INVALID_JSON_POINTER` | Bad RFC 6901 pointer syntax |
 | `-9` | `SCALAR_DOCUMENT_AS_VALUE` | Scalar doc used as container |
+| `-10` | `NUMBER_OUT_OF_RANGE` / `BIGINT_ERROR` | Number does not fit the requested type |
+| `-11` | `MEMALLOC` / `OUT_OF_CAPACITY` | Native allocation failed |
+| `-12` | `DEPTH_ERROR` | Nesting deeper than the parser's max depth |
+| `-13` | `TRAILING_CONTENT` | Extra content after the JSON value |
 | `-99` | *(unknown)* | Unrecognised simdjson error |
+
+When adding a bridge function, make sure any new simdjson `error_code` it can return is handled in
+`translate_error`; anything unmapped surfaces as an opaque `-99`.
 
 ---
 

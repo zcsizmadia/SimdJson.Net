@@ -33,7 +33,7 @@ internal static class NativeLoader
 
                 if (_handle == 0)
                 {
-                    _handle = NativeLibrary.Load(ResolveLibraryPath());
+                    _handle = LoadLibrary();
                 }
 
                 return _handle;
@@ -43,11 +43,24 @@ internal static class NativeLoader
         // rather than at the first P/Invoke call site.
         if (_handle == 0)
         {
-            _handle = NativeLibrary.Load(ResolveLibraryPath());
+            _handle = LoadLibrary();
         }
     }
 
-    private static string ResolveLibraryPath()
+    private static nint LoadLibrary()
+    {
+        string? path = ResolveLibraryPath();
+        if (path is not null)
+        {
+            return NativeLibrary.Load(path);
+        }
+
+        // Fall back to the runtime's own probing (NATIVE_DLL_SEARCH_DIRECTORIES for
+        // single-file publish, app-local deps.json native assets, then the OS loader path).
+        return NativeLibrary.Load(LibraryName, typeof(NativeLoader).Assembly, searchPath: null);
+    }
+
+    private static string? ResolveLibraryPath()
     {
         string rid = GetRuntimeIdentifier();
         string libName = GetLibraryName();
@@ -70,8 +83,7 @@ internal static class NativeLoader
             }
         }
 
-        // Fall back to the OS loader search path (LD_LIBRARY_PATH / DYLD_LIBRARY_PATH / PATH).
-        return libName;
+        return null;
     }
 
     private static IEnumerable<string> GetSearchDirs()

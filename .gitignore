@@ -115,3 +115,4 @@ runtimes/
 nupkgs/
 
 SimdJson.Net.Native/build/
+SimdJson.Net.Native/build-release/

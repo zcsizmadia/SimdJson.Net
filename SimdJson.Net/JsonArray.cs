@@ -22,13 +22,26 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
     }
 
     /// <summary>
+    /// Throws if this array, or the document that owns its native memory, has been disposed.
+    /// </summary>
+    private void ThrowIfDisposed()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_owner is { IsDisposed: true })
+        {
+            throw new ObjectDisposedException(nameof(JsonDocument),
+                "The JsonDocument that owns this array has been disposed.");
+        }
+    }
+
+    /// <summary>
     /// Returns the number of elements (requires a full native scan — use sparingly).
     /// </summary>
     public int Count
     {
         get
         {
-            ObjectDisposedException.ThrowIf(_disposed, this);
+            ThrowIfDisposed();
             SimdJsonException.ThrowIfError(NativeMethods.ArrayCount(Handle, out nuint n));
             return (int)n;
         }
@@ -37,7 +50,7 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
     /// <summary>Iterates over the array elements.</summary>
     public IEnumerator<JsonValue> GetEnumerator()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ArrayBegin(Handle, out nint iter));
         try
         {
@@ -68,7 +81,7 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
     public JsonValue ElementAt(int index)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ArrayBegin(Handle, out nint iter));
         try
         {
@@ -103,7 +116,7 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
     public JsonValue At(int index)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(index);
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ArrayAt(Handle, (nuint)index, out nint h));
         return new JsonValue(h, _owner);
     }
@@ -114,7 +127,7 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
     /// </summary>
     public unsafe string GetRawJson()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ArrayRawJson(Handle, out byte* ptr, out nuint len));
         return System.Text.Encoding.UTF8.GetString(ptr, (int)len);
     }
@@ -125,7 +138,7 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
     /// </summary>
     public unsafe ReadOnlySpan<byte> GetRawJsonSpan()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ArrayRawJson(Handle, out byte* ptr, out nuint len));
         return new ReadOnlySpan<byte>(ptr, (int)len);
     }
@@ -133,7 +146,7 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
     /// <summary>Resets the array iterator so the array can be traversed again.</summary>
     public void Reset()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ArrayReset(Handle));
     }
 
@@ -145,7 +158,7 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
     /// </summary>
     public bool IsEmpty()
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ArrayIsEmpty(Handle, out int v));
         return v != 0;
     }
@@ -157,7 +170,7 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
     /// </summary>
     public unsafe JsonValue AtPointer(string pointer)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         int maxBytes = System.Text.Encoding.UTF8.GetMaxByteCount(pointer.Length) + 1;
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = System.Text.Encoding.UTF8.GetBytes(pointer, buf);
@@ -174,7 +187,7 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
     /// </summary>
     public unsafe JsonValue AtPath(string jsonPath)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
         int maxBytes = System.Text.Encoding.UTF8.GetMaxByteCount(jsonPath.Length) + 1;
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = System.Text.Encoding.UTF8.GetBytes(jsonPath, buf);
@@ -210,19 +223,24 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
     /// </remarks>
     public unsafe void ForEachAtPath(string path, Action<JsonValue> callback)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfDisposed();
+        ArgumentNullException.ThrowIfNull(path);
         ArgumentNullException.ThrowIfNull(callback);
         int maxBytes = System.Text.Encoding.UTF8.GetMaxByteCount(path.Length);
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = System.Text.Encoding.UTF8.GetBytes(path, buf);
-        var gcHandle = GCHandle.Alloc(callback);
+        var context = new JsonValue.WildcardContext(callback);
+        var gcHandle = GCHandle.Alloc(context);
         try
         {
+            int err;
             fixed (byte* p = buf)
             {
-                SimdJsonException.ThrowIfError(NativeMethods.ArrayForEachAtPath(
-                    Handle, p, (nuint)len, JsonValue.s_wildcardTrampolinePtr, GCHandle.ToIntPtr(gcHandle)));
+                err = NativeMethods.ArrayForEachAtPath(
+                    Handle, p, (nuint)len, JsonValue.s_wildcardTrampolinePtr, GCHandle.ToIntPtr(gcHandle));
             }
+            context.Rethrow();
+            SimdJsonException.ThrowIfError(err);
         }
         finally { gcHandle.Free(); }
     }

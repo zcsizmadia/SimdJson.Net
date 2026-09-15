@@ -1,6 +1,6 @@
 # SimdJson.Net
 
-A high-performance .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v4.6.3, exposing the On-Demand API via a thin C ABI bridge.
+A high-performance .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v4.6.11, exposing the On-Demand API via a thin C ABI bridge.
 
 - **`SimdJson.Net`** — idiomatic C# API: `SimdJsonParser`, `JsonDocument`, `JsonValue`, `JsonArray`, `JsonObject`
 
@@ -43,7 +43,7 @@ using var city = doc.AtPointer("/address/city");
 using var val = doc["address"]["city"];
 
 // Get simdjson version
-Console.WriteLine(SimdJsonParser.GetVersion()); // e.g. "4.6.3"
+Console.WriteLine(SimdJsonParser.GetVersion()); // e.g. "4.6.11"
 ```
 
 ## Installation

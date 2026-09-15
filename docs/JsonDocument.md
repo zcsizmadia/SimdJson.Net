@@ -18,7 +18,7 @@ The root result of a `SimdJsonParser.Parse` call. Holds a native handle to the p
 |--------|-------------|
 | `GetArray()` | Root as [`JsonArray`](JsonArray.md) (throws if root is not an array) |
 | `GetObject()` | Root as [`JsonObject`](JsonObject.md) (throws if root is not an object) |
-| `GetValue()` | Root as [`JsonValue`](JsonValue.md) (scalar roots only) |
+| `GetValue()` | Root as [`JsonValue`](JsonValue.md) (array/object roots only; throws on scalar roots) |
 
 ## Field / pointer lookup *(root must be an object)*
 

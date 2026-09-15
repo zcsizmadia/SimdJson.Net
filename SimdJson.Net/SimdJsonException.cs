@@ -40,6 +40,10 @@ public sealed class SimdJsonException : Exception
         -7  => "Iteration error.",
         -8  => "Invalid JSON pointer.",
         -9  => "Scalar document cannot be used as a value.",
+        -10 => "Number out of range.",
+        -11 => "Native memory allocation failed.",
+        -12 => "Maximum JSON nesting depth exceeded.",
+        -13 => "Unexpected trailing content after the JSON value.",
         -99 => "Unknown native error.",
         _   => $"Native error {code}."
     };

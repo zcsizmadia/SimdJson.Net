@@ -9,13 +9,22 @@ namespace SimdJson;
 /// that is reused across <see cref="Parse"/> calls to avoid allocations.
 /// </summary>
 /// <remarks>
+/// <para>
 /// Disposing releases the native parser handle. After disposal the instance must not
 /// be used. Use <see cref="SimdJsonParser.Shared"/> for a convenient thread-local instance.
+/// </para>
+/// <para>
+/// Only one <see cref="JsonDocument"/> may be alive per parser at a time. Calling
+/// <see cref="Parse(ReadOnlySpan{byte})"/> while a previous document from the same parser has
+/// not been disposed throws <see cref="InvalidOperationException"/>. Disposing the parser also
+/// disposes its live document.
+/// </para>
 /// </remarks>
 public sealed class SimdJsonParser : IDisposable
 {
     private nint _handle;
     private bool _disposed;
+    private JsonDocument? _liveDocument;
 
     [ThreadStatic]
     private static SimdJsonParser? _shared;
@@ -24,10 +33,16 @@ public sealed class SimdJsonParser : IDisposable
     /// A thread-local <see cref="SimdJsonParser"/> instance.
     /// Do not dispose this instance — it is owned by the thread.
     /// </summary>
+    /// <remarks>
+    /// The instance is bound to the calling thread. Do not hold a document obtained from
+    /// <see cref="Shared"/> across an <c>await</c>: the continuation may run on another thread
+    /// whose own <see cref="Shared"/> parser is unrelated, and other work resumed on the original
+    /// thread would find the parser still occupied.
+    /// </remarks>
     public static SimdJsonParser Shared => _shared ??= new SimdJsonParser();
 
     /// <summary>
-    /// Returns the simdjson library version string (e.g. <c>"4.6.3"</c>).
+    /// Returns the simdjson library version string (e.g. <c>"4.6.11"</c>).
     /// </summary>
     public static unsafe string GetVersion()
     {
@@ -65,7 +80,9 @@ public sealed class SimdJsonParser : IDisposable
     /// </param>
     public SimdJsonParser(nuint maxCapacity)
     {
-        _handle = NativeMethods.CreateParserWithCapacity(maxCapacity);
+        _handle = maxCapacity == 0
+            ? NativeMethods.CreateParser()
+            : NativeMethods.CreateParserWithCapacity(maxCapacity);
         if (_handle == 0)
         {
             throw new InvalidOperationException("Failed to create native SimdJson parser.");
@@ -115,22 +132,61 @@ public sealed class SimdJsonParser : IDisposable
 
     /// <summary>
     /// Parses a UTF-8 JSON span and returns an owning <see cref="JsonDocument"/>.
-    /// The document's lifetime is independent of this parser but only one document
-    /// may be in use per parser at a time (simdjson On-Demand constraint).
+    /// The returned document borrows this parser's internal buffers: it must be disposed
+    /// before the next <c>Parse</c> call and before the parser is disposed. Strings and spans
+    /// read from the document are valid only while the document is alive.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// A previous <see cref="JsonDocument"/> from this parser has not been disposed.
+    /// </exception>
     public unsafe JsonDocument Parse(ReadOnlySpan<byte> utf8Json)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfBusy();
 
         nint docHandle;
         int err;
-        fixed (byte* p = utf8Json)
+        if (utf8Json.IsEmpty)
         {
-            err = NativeMethods.Parse(_handle, p, (nuint)utf8Json.Length, out docHandle);
+            byte empty = 0;
+            err = NativeMethods.Parse(_handle, &empty, 0, out docHandle);
+        }
+        else
+        {
+            fixed (byte* p = utf8Json)
+            {
+                err = NativeMethods.Parse(_handle, p, (nuint)utf8Json.Length, out docHandle);
+            }
         }
 
         SimdJsonException.ThrowIfError(err);
-        return new JsonDocument(docHandle);
+        return AttachDocument(docHandle);
+    }
+
+    private void ThrowIfBusy()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_liveDocument is { IsDisposed: false })
+        {
+            throw new InvalidOperationException(
+                "The previous JsonDocument produced by this SimdJsonParser has not been disposed. " +
+                "A parser supports one live document at a time; dispose it before parsing again, " +
+                "or use a separate SimdJsonParser instance.");
+        }
+    }
+
+    private JsonDocument AttachDocument(nint docHandle)
+    {
+        var doc = new JsonDocument(docHandle, this);
+        _liveDocument = doc;
+        return doc;
+    }
+
+    internal void OnDocumentDisposed(JsonDocument doc)
+    {
+        if (ReferenceEquals(_liveDocument, doc))
+        {
+            _liveDocument = null;
+        }
     }
 
     /// <summary>
@@ -163,13 +219,29 @@ public sealed class SimdJsonParser : IDisposable
     }
 
     /// <summary>
-    /// Parses a UTF-16 .NET string asynchronously (transcoding happens on a thread-pool thread).
+    /// Parses a UTF-16 .NET string and returns the result as a completed <see cref="Task{TResult}"/>.
     /// </summary>
+    /// <remarks>
+    /// Parsing is CPU-bound and typically takes microseconds, so the work runs synchronously on the
+    /// calling thread. Running it on a thread-pool thread would make <see cref="Shared"/> unsafe,
+    /// because that parser is bound to the thread that obtained it.
+    /// </remarks>
     public Task<JsonDocument> ParseAsync(string json, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(json);
-        // P/Invoke is CPU-bound and fast; offload to thread pool so the caller's thread is freed.
-        return Task.Run(() => Parse(json), cancellationToken);
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled<JsonDocument>(cancellationToken);
+        }
+
+        try
+        {
+            return Task.FromResult(Parse(json));
+        }
+        catch (Exception ex)
+        {
+            return Task.FromException<JsonDocument>(ex);
+        }
     }
 
     /// <summary>
@@ -190,17 +262,25 @@ public sealed class SimdJsonParser : IDisposable
     /// </summary>
     public unsafe JsonDocument ParseAllowIncompleteJson(ReadOnlySpan<byte> utf8Json)
     {
-        ObjectDisposedException.ThrowIf(_disposed, this);
+        ThrowIfBusy();
 
         nint docHandle;
         int err;
-        fixed (byte* p = utf8Json)
+        if (utf8Json.IsEmpty)
         {
-            err = NativeMethods.ParseAllowIncompleteJson(_handle, p, (nuint)utf8Json.Length, out docHandle);
+            byte empty = 0;
+            err = NativeMethods.ParseAllowIncompleteJson(_handle, &empty, 0, out docHandle);
+        }
+        else
+        {
+            fixed (byte* p = utf8Json)
+            {
+                err = NativeMethods.ParseAllowIncompleteJson(_handle, p, (nuint)utf8Json.Length, out docHandle);
+            }
         }
 
         SimdJsonException.ThrowIfError(err);
-        return new JsonDocument(docHandle);
+        return AttachDocument(docHandle);
     }
 
     /// <summary>
@@ -239,8 +319,15 @@ public sealed class SimdJsonParser : IDisposable
         }
 
         _disposed = true;
+        _liveDocument?.Dispose();
+        _liveDocument = null;
         NativeMethods.DestroyParser(_handle);
         _handle = 0;
+
+        if (ReferenceEquals(_shared, this))
+        {
+            _shared = null;
+        }
     }
 
     // ── Static utilities (no parser instance required) ────────────────────────

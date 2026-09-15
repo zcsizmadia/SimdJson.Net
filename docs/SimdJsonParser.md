@@ -44,7 +44,7 @@ All `Parse` methods return a `JsonDocument` that **must be disposed**.
 
 | Member | Description |
 |--------|-------------|
-| `GetVersion()` | Returns the simdjson version string (e.g. `"4.6.3"`) |
+| `GetVersion()` | Returns the simdjson version string (e.g. `"4.6.11"`) |
 | `Minify(string)` | Remove all insignificant whitespace; returns a `string` |
 | `MinifyUtf8(ReadOnlySpan<byte>)` | Minify UTF-8 JSON bytes; returns `byte[]` |
 | `ValidateUtf8(ReadOnlySpan<byte>)` | Returns `true` if the bytes are valid UTF-8 |
@@ -67,7 +67,7 @@ using var doc3 = await parser.ParseAsync(file, cancellationToken);
 // Utilities
 string mini = SimdJsonParser.Minify("""{ "a" : 1 , "b" : 2 }"""); // {"a":1,"b":2}
 bool ok      = SimdJsonParser.ValidateUtf8(someBytes);
-string ver   = SimdJsonParser.GetVersion();  // "4.6.3"
+string ver   = SimdJsonParser.GetVersion();  // "4.6.11"
 ```
 
 ---

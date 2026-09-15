@@ -15,13 +15,13 @@ Do not dispose `SimdJsonParser.Shared`.
 
 ## One document at a time
 
-A single `SimdJsonParser` can only have one live `JsonDocument` at any moment. Parsing a second document on the same instance invalidates the first:
+A single `SimdJsonParser` can only have one live `JsonDocument` at any moment. Parsing again while the previous document is undisposed throws `InvalidOperationException` instead of silently invalidating it:
 
 ```csharp
-// BAD — doc1 is invalidated when doc2 is parsed
+// THROWS InvalidOperationException — doc1 has not been disposed
 using var parser = new SimdJsonParser();
 using var doc1   = parser.Parse(json1);
-using var doc2   = parser.Parse(json2); // doc1 is now invalid
+using var doc2   = parser.Parse(json2);
 
 // GOOD — use separate parsers, or dispose before reusing
 using var parser = new SimdJsonParser();
@@ -33,6 +33,27 @@ using var doc2 = parser.Parse(json2); // safe
 ```
 
 When using `SimdJsonParser.Shared`, the same constraint applies. If you need to parse a second document while the first is still alive (e.g. for number-in-string helpers), create a separate `new SimdJsonParser()` instance.
+
+Disposing a parser disposes its live document, and every `JsonValue`, `JsonArray`, and `JsonObject` from a disposed document throws `ObjectDisposedException` rather than reading freed memory.
+
+---
+
+## Span lifetime
+
+`GetStringSpan()`, `GetWobblyStringSpan()`, `GetRawJsonSpan()`, and `GetRawJsonTokenSpan()` return pointers into buffers owned by the **parser**, not by the document. They stay valid only until the owning parser parses again or is disposed. Copy the bytes (or call the `string`-returning overload) if you need the data to outlive the document.
+
+```csharp
+// BAD — span is dangling after the parser is reused
+ReadOnlySpan<byte> name;
+using (var doc = parser.Parse(json1)) { using var v = doc.GetField("name"); name = v.GetStringSpan(); }
+using var next = parser.Parse(json2); // 'name' now points at overwritten memory
+```
+
+---
+
+## Async and `Shared`
+
+`SimdJsonParser.Shared` is bound to the thread that requested it. Do not hold a document obtained from `Shared` across an `await`: the continuation may resume on a different thread, and other work resuming on the original thread would find that parser still occupied. Use a dedicated `new SimdJsonParser()` per logical operation in async code.
 
 ---
 
@@ -104,7 +125,7 @@ foreach (var item in arr) { ... }
 
 ## Parser capacity
 
-Use `new SimdJsonParser(maxCapacity)` or set `parser.MaxCapacity` to enforce a size limit (e.g. to prevent oversized documents from consuming memory). `parser.Capacity` reflects the current internal buffer size after at least one parse call.
+Use `new SimdJsonParser(maxCapacity)` or set `parser.MaxCapacity` to enforce a size limit (e.g. to prevent oversized documents from consuming memory). Passing `0` selects the simdjson default rather than a zero-byte limit. `parser.Capacity` reflects the current internal buffer size after at least one parse call.
 
 ---
 
