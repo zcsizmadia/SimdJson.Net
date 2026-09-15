@@ -11,6 +11,25 @@ The root result of a `SimdJsonParser.Parse` call. Holds a native handle to the p
 | `ValueKind` | `JsonValueKind` of the document root |
 | `IsScalar()` | `true` if the root is not an array or object |
 | `IsString()` | `true` if the root is a JSON string |
+| `AtEnd()` | `true` if nothing follows the root value; see below |
+
+### Detecting trailing content
+
+simdjson validates the root container but does not report content after it, so `[1,2] trailing` iterates without complaint. `AtEnd()` is the check that catches this, and it is meaningful only after the root value has been fully consumed.
+
+```csharp
+using var doc = parser.Parse(untrusted);
+using (var arr = doc.GetArray())
+{
+    foreach (var item in arr) { /* ... */ item.Dispose(); }
+}
+if (!doc.AtEnd())
+{
+    throw new InvalidDataException("Trailing content after the root array.");
+}
+```
+
+Scalar roots are different: simdjson reports trailing content there itself, as `SimdJsonException` with code `-13`.
 
 ## Root access
 
@@ -66,6 +85,8 @@ Use when the JSON document root is a bare scalar value (e.g. `"hello"`, `42`, `t
 | `GetDouble()` | Root as `double` |
 | `GetInt64()` | Root as `long` |
 | `GetUInt64()` | Root as `ulong` |
+| `GetInt32()` | Root as `int`; throws error `-10` if the value does not fit |
+| `GetUInt32()` | Root as `uint`; throws error `-10` if the value does not fit |
 | `GetDoubleInString()` | Parse a `double` out of a root JSON string (e.g. `"3.14"`) |
 | `GetInt64InString()` | Parse a `long` out of a root JSON string (e.g. `"-99"`) |
 | `GetUInt64InString()` | Parse a `ulong` out of a root JSON string (e.g. `"100"`) |

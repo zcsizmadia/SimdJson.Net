@@ -1107,6 +1107,17 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ParserSetMaxCapacity(
     return SIMDJSON_BRIDGE_SUCCESS;
 }
 
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ParserAllocate(
+    SimdJsonParser parser, size_t capacity, size_t max_depth)
+{
+    CHECK_NULL(parser);
+    // A zero max_depth caused a heap out-of-bounds write before simdjson 4.6.11 and is
+    // never meaningful; reject it here as well as in the managed layer.
+    if (max_depth == 0) return SIMDJSON_BRIDGE_ERR_DEPTH;
+    auto* p = static_cast<simdjson::ondemand::parser*>(parser);
+    return translate_error(p->allocate(capacity, max_depth));
+}
+
 extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ParserMaxDepth(
     SimdJsonParser parser, size_t* out_max_depth)
 {
@@ -1609,6 +1620,37 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetInt64(
     auto* bd = static_cast<BridgeDocument*>(doc);
     auto err = bd->doc.get_int64().get(*out_val);
     return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetInt32(
+    SimdJsonDocument doc, int32_t* out_val)
+{
+    CHECK_NULL(doc);
+    CHECK_NULL(out_val);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    auto err = bd->doc.get_int32().get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetUInt32(
+    SimdJsonDocument doc, uint32_t* out_val)
+{
+    CHECK_NULL(doc);
+    CHECK_NULL(out_val);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    auto err = bd->doc.get_uint32().get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentAtEnd(
+    SimdJsonDocument doc, int32_t* out_at_end)
+{
+    CHECK_NULL(doc);
+    CHECK_NULL(out_at_end);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    // at_end() returns a plain bool, not a simdjson_result.
+    *out_at_end = bd->doc.at_end() ? 1 : 0;
+    return SIMDJSON_BRIDGE_SUCCESS;
 }
 
 extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetUInt64(

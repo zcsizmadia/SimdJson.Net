@@ -487,6 +487,22 @@ internal static unsafe partial class NativeMethods
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int DocumentGetUInt64(nint doc, out ulong outVal);
 
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetInt32")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetInt32(nint doc, out int outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetUInt32")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetUInt32(nint doc, out uint outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentAtEnd")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentAtEnd(nint doc, out int outAtEnd);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ParserAllocate")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ParserAllocate(nint parser, nuint capacity, nuint maxDepth);
+
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetDoubleInString")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int DocumentGetDoubleInString(nint doc, out double outVal);

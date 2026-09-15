@@ -38,7 +38,19 @@ All `Parse` methods return a `JsonDocument` that **must be disposed**.
 |--------|-------------|
 | `Capacity` | Current internal buffer size in bytes; `0` before the first parse |
 | `MaxCapacity` *(get/set)* | Maximum allowed document size in bytes |
-| `MaxDepth` | Maximum JSON nesting depth the parser supports |
+| `MaxDepth` | Maximum JSON nesting depth the parser supports; set it with `Allocate` |
+| `Allocate(nuint capacity, nuint maxDepth = 1024)` | Pre-allocates buffers for a document size and nesting depth |
+
+### `Allocate`
+
+Calling `Allocate` up front avoids the reallocation that the first large parse would otherwise trigger, which is worth doing when you know the working document size in advance.
+
+It also sets `MaxDepth`. Be aware of how narrow that guarantee is: simdjson consults the depth limit when walking JSONPath wildcards, where exceeding it raises error `-12` instead of recursing. Depth is not otherwise enforced during ordinary parsing in release builds of the native library, because simdjson compiles those checks out. Bound untrusted input with `capacity` and `MaxCapacity`, not with depth alone.
+
+```csharp
+using var parser = new SimdJsonParser();
+parser.Allocate(capacity: 4 * 1024 * 1024, maxDepth: 64);
+```
 
 ## Static utilities
 

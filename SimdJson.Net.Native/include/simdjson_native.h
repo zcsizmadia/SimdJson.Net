@@ -460,9 +460,20 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParserMaxCapacity(
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParserSetMaxCapacity(
     SimdJsonParser parser, size_t max_capacity);
 
-/** Returns the maximum JSON nesting depth the parser supports (compile-time constant). */
+/** Returns the maximum JSON nesting depth the parser supports. */
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParserMaxDepth(
     SimdJsonParser parser, size_t* out_max_depth);
+
+/**
+ * Pre-allocates parser buffers for documents up to `capacity` bytes and `max_depth` nesting.
+ * A max_depth of 0 is rejected with SIMDJSON_BRIDGE_ERR_DEPTH.
+ *
+ * Scope of max_depth: simdjson consults it when iterating JSONPath wildcards, which report
+ * SIMDJSON_BRIDGE_ERR_DEPTH beyond the limit. Its use for general nesting enforcement depends
+ * on SIMDJSON_DEVELOPMENT_CHECKS, which is disabled in release builds.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParserAllocate(
+    SimdJsonParser parser, size_t capacity, size_t max_depth);
 
 // ─── Structured number ───────────────────────────────────────────────────────
 
@@ -635,6 +646,20 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetInt64(
     SimdJsonDocument doc, int64_t* out_val);
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetUInt64(
     SimdJsonDocument doc, uint64_t* out_val);
+/** Reads a scalar-root document as a 32-bit integer.
+ *  Returns SIMDJSON_BRIDGE_ERR_NUMBER_OUT_OF_RANGE if the value does not fit. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetInt32(
+    SimdJsonDocument doc, int32_t* out_val);
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetUInt32(
+    SimdJsonDocument doc, uint32_t* out_val);
+
+/**
+ * Returns 1 if the document has been fully consumed with nothing after it.
+ * Only meaningful once the root value has been read: a 0 result on a consumed
+ * document means trailing content follows the root array or object.
+ */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentAtEnd(
+    SimdJsonDocument doc, int32_t* out_at_end);
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetDoubleInString(
     SimdJsonDocument doc, double* out_val);
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetInt64InString(
