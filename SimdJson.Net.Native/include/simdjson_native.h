@@ -239,13 +239,20 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectBegin(
 
 /**
  * Advances the iterator.
- * On each step, *out_key_ptr / *out_key_len receive the unescaped field key and
- * *out_value receives the field value.
+ * On each step, *out_key_ptr / *out_key_len receive the unescaped field key,
+ * *out_escaped_key_ptr / *out_escaped_key_len receive the key exactly as it appears in the
+ * JSON text with escape sequences intact, and *out_value receives the field value.
  * When all fields are visited, *out_done is set to 1.
+ *
+ * The escaped key is what the *GetFieldByKey, *FindField and *AtPointer lookups compare
+ * against, so it is the form to pass back to them. It points into the document buffer and
+ * stays valid for the document's lifetime; the unescaped key lives in the iterator's own
+ * buffer and is overwritten by the next call.
  */
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectIterNext(
     SimdJsonObjectIter iter,
     const char** out_key_ptr, size_t* out_key_len,
+    const char** out_escaped_key_ptr, size_t* out_escaped_key_len,
     SimdJsonValue* out_value,
     int32_t* out_done);
 

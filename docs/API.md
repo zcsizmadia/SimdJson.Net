@@ -60,6 +60,7 @@ using var obj = doc.GetObject();         // or val.GetObject()
 using var val = obj.GetField("key");     // order-insensitive
 obj.TryGetField("opt", out var opt);
 foreach (var prop in obj) { ...; prop.Value.Dispose(); }
+// prop.Name is unescaped; prop.EscapedName is what GetField matches against
 ```
 
 ### Pointers & paths

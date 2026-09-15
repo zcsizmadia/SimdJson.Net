@@ -261,6 +261,7 @@ When modifying the CMake build, update both `CMakeLists.txt` and `CMakePresets.j
 - **`using var`** everywhere for disposable native handles.
 - **`ThrowIfError`** immediately after every P/Invoke call.
 - **String passing to native**: `fixed (byte* p = MemoryMarshal.AsBytes(key.AsSpan()))` — keys are passed as UTF-8 byte pointers with a length. See existing `GetField` implementations.
+- **Key matching is against escaped bytes**: simdjson compares a lookup key with the raw bytes in the document, so `GetField("a\"b")` never matches `{"a\"b":1}`. Object iteration exposes both forms, `JsonProperty.Name` unescaped and `JsonProperty.EscapedName` as written; only the latter round-trips into a lookup.
 - **Target frameworks**: `net8.0;net9.0;net10.0` — all three must stay in sync.
 - The experimental `ParseAllowIncompleteJson` path is guarded by `#ifdef SIMDJSON_EXPERIMENTAL_ALLOW_INCOMPLETE_JSON` in the C++ bridge; this define is set via `add_compile_definitions` in `CMakeLists.txt`.
 

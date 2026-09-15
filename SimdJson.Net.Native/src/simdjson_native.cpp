@@ -527,12 +527,15 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectBegin(
 extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectIterNext(
     SimdJsonObjectIter iter,
     const char** out_key_ptr, size_t* out_key_len,
+    const char** out_escaped_key_ptr, size_t* out_escaped_key_len,
     SimdJsonValue* out_value,
     int32_t* out_done)
 {
     CHECK_NULL(iter);
     CHECK_NULL(out_key_ptr);
     CHECK_NULL(out_key_len);
+    CHECK_NULL(out_escaped_key_ptr);
+    CHECK_NULL(out_escaped_key_len);
     CHECK_NULL(out_value);
     CHECK_NULL(out_done);
 
@@ -546,6 +549,8 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectIterNext(
         *out_done = 1;
         *out_key_ptr = nullptr;
         *out_key_len = 0;
+        *out_escaped_key_ptr = nullptr;
+        *out_escaped_key_len = 0;
         *out_value   = nullptr;
         return SIMDJSON_BRIDGE_SUCCESS;
     }
@@ -553,6 +558,10 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectIterNext(
         simdjson::ondemand::field f;
         auto err = (*it->current).get(f);
         if (err) return translate_error(err);
+
+        // escaped_key() must be read first: unescaped_key() consumes the key.
+        // It points into the document's own buffer, which outlives this iterator.
+        const std::string_view escaped_sv = f.escaped_key();
 
         // Unescape the key and store it in the iterator's own buffer so the
         // pointer remains valid until the next call to Next.
@@ -567,6 +576,8 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectIterNext(
         it->need_advance = true;  // advance next time, not now
         *out_key_ptr = it->key_buf.data();
         *out_key_len = it->key_buf.size();
+        *out_escaped_key_ptr = escaped_sv.data();
+        *out_escaped_key_len = escaped_sv.size();
         *out_value   = bv;
         *out_done    = 0;
         return SIMDJSON_BRIDGE_SUCCESS;

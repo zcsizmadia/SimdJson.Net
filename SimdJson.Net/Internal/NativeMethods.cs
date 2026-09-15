@@ -152,6 +152,7 @@ internal static unsafe partial class NativeMethods
     internal static partial int ObjectIterNext(
         nint iter,
         out byte* outKeyPtr, out nuint outKeyLen,
+        out byte* outEscapedKeyPtr, out nuint outEscapedKeyLen,
         out nint outValue,
         out int outDone);
 
