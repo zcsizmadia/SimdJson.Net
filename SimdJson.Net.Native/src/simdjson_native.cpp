@@ -290,7 +290,7 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseMany(
     const char*     json,
     size_t          length,
     size_t          batch_size,
-    int32_t         allow_comma_separated,
+    int32_t         stream_format,
     SimdJsonStream* out_stream)
 {
     CHECK_NULL(parser);
@@ -307,9 +307,23 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseMany(
         // treating it as "unset", which would reject any document longer than that.
         const size_t effective_batch =
             batch_size ? batch_size : simdjson::ondemand::DEFAULT_BATCH_SIZE;
-        const auto format = allow_comma_separated != 0
-            ? simdjson::stream_format::comma_delimited
-            : simdjson::stream_format::whitespace_delimited;
+        simdjson::stream_format format;
+        switch (stream_format) {
+            case SIMDJSON_STREAM_FORMAT_WHITESPACE_DELIMITED:
+                format = simdjson::stream_format::whitespace_delimited;
+                break;
+            case SIMDJSON_STREAM_FORMAT_NEWLINE_DELIMITED:
+                format = simdjson::stream_format::newline_delimited;
+                break;
+            case SIMDJSON_STREAM_FORMAT_JSON_SEQUENCE:
+                format = simdjson::stream_format::json_sequence;
+                break;
+            case SIMDJSON_STREAM_FORMAT_COMMA_DELIMITED:
+                format = simdjson::stream_format::comma_delimited;
+                break;
+            default:
+                return SIMDJSON_BRIDGE_ERR_UNKNOWN;
+        }
         auto err = p->iterate_many(bs->json_buf, effective_batch, format).get(bs->stream);
         if (err) return translate_error(err);
 

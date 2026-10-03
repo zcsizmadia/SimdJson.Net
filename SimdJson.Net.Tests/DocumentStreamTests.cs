@@ -102,6 +102,79 @@ public class DocumentStreamTests
     }
 
     [Test]
+    public async Task Parse_CommaSeparatedFormat_ReadsDocuments()
+    {
+        var ids = NdjsonParser.Parse(
+            Utf8("{\"id\":1},{\"id\":2}"), SelectId,
+            new NdjsonParserOptions { StreamFormat = JsonStreamFormat.CommaDelimited });
+        await Assert.That(ids).IsEquivalentTo(new long[] { 1, 2 });
+    }
+
+    [Test]
+    public async Task Parse_JsonTextSequence_ReadsRecords()
+    {
+        var ids = NdjsonParser.Parse(
+            Utf8("\u001e{\"id\":1}\n\u001e{\"id\":2}\n"), SelectId,
+            new NdjsonParserOptions { StreamFormat = JsonStreamFormat.JsonTextSequence });
+        await Assert.That(ids).IsEquivalentTo(new long[] { 1, 2 });
+    }
+
+    [Test]
+    public async Task Parse_JsonTextSequence_EmptyInputReturnsNothing()
+    {
+        var ids = NdjsonParser.Parse(ReadOnlySpan<byte>.Empty, SelectId,
+            new NdjsonParserOptions { StreamFormat = JsonStreamFormat.JsonTextSequence });
+        await Assert.That(ids.Count).IsEqualTo(0);
+    }
+
+    [Test]
+    public async Task Parse_JsonTextSequence_MalformedRecordThrows()
+    {
+        await Assert.That(() => NdjsonParser.Parse(
+            Utf8("\u001e{\"id\":1}\n\u001e{not json}\n\u001e{\"id\":3}\n"), SelectId,
+            new NdjsonParserOptions { StreamFormat = JsonStreamFormat.JsonTextSequence }))
+            .Throws<SimdJsonException>();
+    }
+
+    [Test]
+    public async Task OpenStream_InvalidStreamFormat_Throws()
+    {
+        await Assert.That(() => NdjsonParser.OpenStream(
+            Utf8("{\"id\":1}"),
+            new NdjsonParserOptions { StreamFormat = (JsonStreamFormat)int.MaxValue }))
+            .Throws<ArgumentOutOfRangeException>();
+    }
+
+    [Test]
+    public async Task OpenStream_LegacyCommaOptionCannotConflictWithFormat()
+    {
+        await Assert.That(() => NdjsonParser.OpenStream(
+            Utf8("{\"id\":1}"),
+            new NdjsonParserOptions
+            {
+                AllowCommaSeparated = true,
+                StreamFormat = JsonStreamFormat.JsonTextSequence
+            }))
+            .Throws<ArgumentException>();
+    }
+
+    [Test]
+    public async Task OpenStream_NewlineDelimited_SkipsUnreadRemainderOfPreviousLine()
+    {
+        using var stream = NdjsonParser.OpenStream(
+            Utf8("{\"id\":1,\"unused\":[1,2,3]}\n{\"id\":2}\n"),
+            new NdjsonParserOptions { StreamFormat = JsonStreamFormat.NewlineDelimited });
+
+        await Assert.That(stream.MoveNext()).IsTrue();
+        using (var unused = stream.Current!.GetField("unused").GetArray())
+        {
+        }
+
+        await Assert.That(stream.MoveNext()).IsTrue();
+        await Assert.That(SelectId(stream.Current!)).IsEqualTo(2L);
+    }
+
+    [Test]
     public async Task Parse_CommaSeparated_RejectedByDefault()
     {
         // Without the option the comma is not a document separator, so the second document

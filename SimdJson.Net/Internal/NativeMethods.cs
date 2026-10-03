@@ -73,7 +73,7 @@ internal static unsafe partial class NativeMethods
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int ParseMany(
         nint parser, byte* json, nuint length, nuint batchSize,
-        int allowCommaSeparated, out nint outStream);
+        int streamFormat, out nint outStream);
 
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_StreamNext")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]

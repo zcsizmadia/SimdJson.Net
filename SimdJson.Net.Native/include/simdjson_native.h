@@ -37,6 +37,13 @@ typedef void* SimdJsonArrayIter; // iterator over an array
 typedef void* SimdJsonObjectIter;// iterator over an object
 typedef void* SimdJsonStream;    // ondemand::document_stream over NDJSON input
 
+typedef enum SimdJsonStreamFormat {
+    SIMDJSON_STREAM_FORMAT_WHITESPACE_DELIMITED = 0,
+    SIMDJSON_STREAM_FORMAT_NEWLINE_DELIMITED = 1,
+    SIMDJSON_STREAM_FORMAT_JSON_SEQUENCE = 2,
+    SIMDJSON_STREAM_FORMAT_COMMA_DELIMITED = 3
+} SimdJsonStreamFormat;
+
 // ─── Error codes ────────────────────────────────────────────────────────────
 // Bridge-specific codes derived from simdjson::error_code.
 // SUCCESS == 0, all error conditions are negative.
@@ -171,7 +178,7 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseInPlace(
 // ─── Document streams (NDJSON / concatenated JSON) ───────────────────────────
 
 /**
- * Opens a stream over newline-delimited or concatenated JSON.
+ * Opens a stream over an in-memory buffer using the selected document separator format.
  *
  * Unlike SimdJsonNative_Parse, stage 1 runs over whole batches rather than one document
  * at a time, and where simdjson was built with threads it overlaps the next batch's
@@ -180,15 +187,14 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseInPlace(
  *
  * @param batch_size            Bytes of input indexed at a time. 0 selects simdjson's default.
  *                              Must exceed the largest single document in the input.
- * @param allow_comma_separated Non-zero to also accept documents separated by commas,
- *                              which permits streaming a top-level JSON array.
+ * @param stream_format One of the SimdJsonStreamFormat values.
  */
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseMany(
     SimdJsonParser parser,
     const char*    json,
     size_t         length,
     size_t         batch_size,
-    int32_t        allow_comma_separated,
+    int32_t        stream_format,
     SimdJsonStream* out_stream);
 
 /**

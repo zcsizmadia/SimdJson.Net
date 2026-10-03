@@ -13,6 +13,7 @@ Complete reference for the `SimdJson.Net` public API.
 | [JsonObject](JsonObject.md) | A JSON object with field lookup and iteration |
 | [NdjsonParser](NdjsonParser.md) | NDJSON (newline-delimited JSON): streaming, parallel, and in-memory batching |
 | [JsonDocumentStream](NdjsonParser.md#jsondocumentstream) | Forward-only stream of documents from one in-memory buffer |
+| `JsonStreamFormat` | Delimiter modes for the in-memory batching parser |
 | [Numbers](Numbers.md) | `JsonNumberType` enum and `JsonNumber` struct |
 | [Types & Errors](Types.md) | `JsonValueKind`, `JsonProperty`, `SimdJsonException` error codes |
 
@@ -252,6 +253,12 @@ while (stream.MoveNext())
 {
     Console.WriteLine(stream.CurrentIndex);
 }
+
+// RFC 7464 JSON text sequence or the newline-delimited fast path
+using var sequence = NdjsonParser.OpenStream(jsonTextSequence, new NdjsonParserOptions
+{
+    StreamFormat = JsonStreamFormat.JsonTextSequence
+});
 ```
 
 See [NdjsonParser](NdjsonParser.md) for the full reference.

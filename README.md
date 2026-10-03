@@ -9,7 +9,7 @@
 
 A high-performance .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v5.0.1, exposing the On-Demand API via a thin C ABI bridge.
 
-- **`SimdJson.Net`** — idiomatic C# API: `SimdJsonParser`, `JsonDocument`, `JsonValue`, `JsonArray`, `JsonObject`, plus `NdjsonParser` and `JsonDocumentStream` for newline-delimited JSON
+- **`SimdJson.Net`** — idiomatic C# API: `SimdJsonParser`, `JsonDocument`, `JsonValue`, `JsonArray`, `JsonObject`, plus `NdjsonParser` and `JsonDocumentStream` for in-memory document streams (whitespace, newline, RFC 7464, or comma delimited)
 
 All native binaries are compiled from source via GitHub Actions — transparent, reproducible, and auditable.
 

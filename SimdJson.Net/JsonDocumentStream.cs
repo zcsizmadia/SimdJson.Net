@@ -2,11 +2,28 @@ using SimdJson.Internal;
 
 namespace SimdJson;
 
+/// <summary>Document separators accepted by the in-memory batching parser.</summary>
+public enum JsonStreamFormat
+{
+    /// <summary>Documents are separated by whitespace or concatenated directly; this is the default.</summary>
+    WhitespaceDelimited = 0,
+
+    /// <summary>Each document occupies one line, allowing simdjson to skip unread document content by advancing to the next line.</summary>
+    NewlineDelimited = 1,
+
+    /// <summary>Documents are preceded by the RFC 7464 record separator character (U+001E).</summary>
+    JsonTextSequence = 2,
+
+    /// <summary>Documents are separated by commas.</summary>
+    CommaDelimited = 3
+}
+
 /// <summary>
 /// A forward-only stream of JSON documents parsed from one in-memory buffer, backed by
 /// simdjson's <c>iterate_many</c>.
 /// </summary>
 /// <remarks>
+/// <para>The input format is selected with <see cref="NdjsonParserOptions.StreamFormat"/>.</para>
 /// <para>
 /// This is the batching parser: simdjson indexes whole batches of input at a time rather than
 /// one document per call, and where the native library was built with threads it overlaps the
@@ -28,17 +45,20 @@ public sealed class JsonDocumentStream : IDisposable
 {
     private nint _handle;
     private readonly SimdJsonParser _parser;
+    private readonly bool _terminalOnNativeError;
     private JsonDocument? _current;
     private bool _disposed;
+    private bool _finished;
 
     /// <summary>
     /// The stream owns the parser that produced it: simdjson's document_stream keeps using the
     /// parser's buffers for the whole iteration, so it cannot be shared or released earlier.
     /// </summary>
-    internal JsonDocumentStream(nint handle, SimdJsonParser parser)
+    internal JsonDocumentStream(nint handle, SimdJsonParser parser, JsonStreamFormat format)
     {
         _handle = handle;
         _parser = parser;
+        _terminalOnNativeError = format == JsonStreamFormat.JsonTextSequence;
     }
 
     /// <summary>
@@ -53,20 +73,32 @@ public sealed class JsonDocumentStream : IDisposable
     /// <remarks>
     /// A document that fails to parse throws <see cref="SimdJsonException"/>. The stream is not
     /// ended by that: calling <see cref="MoveNext"/> again skips the bad document and continues,
-    /// which is how <see cref="NdjsonParserOptions.SkipMalformedLines"/> is implemented.
+    /// which is how <see cref="NdjsonParserOptions.SkipMalformedLines"/> is implemented for
+    /// whitespace, newline, and comma-delimited formats. A malformed RFC 7464 sequence record is
+    /// terminal; dispose the stream after the error.
     /// </remarks>
     public bool MoveNext()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
+        if (_finished)
+        {
+            return false;
+        }
 
         // The previous document points into the stream and dies on advance.
         InvalidateCurrent();
 
         int err = NativeMethods.StreamNext(_handle, out nint docHandle, out int done);
+        if (err != 0 && _terminalOnNativeError)
+        {
+            _finished = true;
+        }
+
         SimdJsonException.ThrowIfError(err);
 
         if (done != 0)
         {
+            _finished = true;
             return false;
         }
 

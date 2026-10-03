@@ -71,11 +71,32 @@ public sealed class NdjsonParserOptions
     public int BatchSize { get; init; } = 0;
 
     /// <summary>
-    /// When <see langword="true"/>, documents separated by commas are accepted as well as by
-    /// newlines, which allows a top-level JSON array to be read as a stream of its elements.
-    /// Defaults to <see langword="false"/>. Used only by the in-memory batching overloads.
+    /// Document separators for the in-memory batching parser. The stream-based parsing overloads
+    /// read one JSON document per line and ignore this option.
+    /// </summary>
+    public JsonStreamFormat StreamFormat { get; init; } = JsonStreamFormat.WhitespaceDelimited;
+
+    /// <summary>
+    /// Legacy alias for <see cref="StreamFormat"/> = <see cref="JsonStreamFormat.CommaDelimited"/>.
+    /// Prefer <see cref="StreamFormat"/> for new code. Used only by the in-memory batching overloads.
     /// </summary>
     public bool AllowCommaSeparated { get; init; } = false;
+
+    internal int GetNativeStreamFormat()
+    {
+        if (!Enum.IsDefined(StreamFormat))
+        {
+            throw new ArgumentOutOfRangeException(nameof(StreamFormat));
+        }
+
+        if (AllowCommaSeparated
+            && StreamFormat is not JsonStreamFormat.WhitespaceDelimited and not JsonStreamFormat.CommaDelimited)
+        {
+            throw new ArgumentException("AllowCommaSeparated cannot be combined with another stream format.", nameof(AllowCommaSeparated));
+        }
+
+        return (int)(AllowCommaSeparated ? JsonStreamFormat.CommaDelimited : StreamFormat);
+    }
 }
 
 /// <summary>
@@ -113,8 +134,9 @@ public static class NdjsonParser
     // ── In-memory batching API (simdjson iterate_many) ────────────────────────
 
     /// <summary>
-    /// Opens a <see cref="JsonDocumentStream"/> over an in-memory NDJSON or concatenated-JSON
-    /// buffer, using simdjson's batching parser.
+    /// Opens a <see cref="JsonDocumentStream"/> over an in-memory buffer using simdjson's
+    /// batching parser. The accepted document separators are selected by
+    /// <see cref="NdjsonParserOptions.StreamFormat"/>.
     /// </summary>
     /// <remarks>
     /// Prefer this over the <see cref="Stream"/> overloads when the input already fits in memory:
@@ -129,6 +151,7 @@ public static class NdjsonParser
     {
         options ??= NdjsonParserOptions.Default;
         ArgumentOutOfRangeException.ThrowIfNegative(options.BatchSize);
+        int nativeStreamFormat = options.GetNativeStreamFormat();
 
         // The stream owns a padded copy of the input, so the caller's span need not outlive
         // this call. The parser handle is owned by the stream for its lifetime.
@@ -141,20 +164,20 @@ public static class NdjsonParser
             {
                 byte empty = 0;
                 err = NativeMethods.ParseMany(parser.Handle, &empty, 0, (nuint)options.BatchSize,
-                    options.AllowCommaSeparated ? 1 : 0, out streamHandle);
+                    nativeStreamFormat, out streamHandle);
             }
             else
             {
                 fixed (byte* p = utf8Ndjson)
                 {
                     err = NativeMethods.ParseMany(parser.Handle, p, (nuint)utf8Ndjson.Length,
-                        (nuint)options.BatchSize, options.AllowCommaSeparated ? 1 : 0,
+                        (nuint)options.BatchSize, nativeStreamFormat,
                         out streamHandle);
                 }
             }
 
             SimdJsonException.ThrowIfError(err);
-            return new JsonDocumentStream(streamHandle, parser);
+            return new JsonDocumentStream(streamHandle, parser, (JsonStreamFormat)nativeStreamFormat);
         }
         catch
         {
@@ -164,17 +187,18 @@ public static class NdjsonParser
     }
 
     /// <summary>
-    /// Parses an in-memory NDJSON buffer with simdjson's batching parser, projecting each
+    /// Parses an in-memory document stream with simdjson's batching parser, projecting each
     /// document through <paramref name="selector"/>. Results are returned in document order.
     /// </summary>
-    /// <param name="utf8Ndjson">UTF-8 encoded NDJSON or concatenated JSON.</param>
+    /// <param name="utf8Ndjson">UTF-8 encoded JSON documents in the selected stream format.</param>
     /// <param name="selector">
     /// Called once per document. The <see cref="JsonDocument"/> is invalidated as soon as the
     /// delegate returns, so do not store it.
     /// </param>
     /// <param name="options">
-    /// Parser options. <see cref="NdjsonParserOptions.SkipMalformedLines"/> and
-    /// <see cref="NdjsonParserOptions.BatchSize"/> apply; the threading and stream options do not.
+    /// <see cref="NdjsonParserOptions.SkipMalformedLines"/>,
+    /// <see cref="NdjsonParserOptions.BatchSize"/>, and
+    /// <see cref="NdjsonParserOptions.StreamFormat"/> apply; the threading options do not.
     /// </param>
     public static List<T> Parse<T>(
         ReadOnlySpan<byte> utf8Ndjson,
@@ -200,7 +224,8 @@ public static class NdjsonParser
 
                 results.Add(selector(stream.Current!));
             }
-            catch (SimdJsonException) when (options.SkipMalformedLines)
+            catch (SimdJsonException) when (options.SkipMalformedLines
+                && options.StreamFormat != JsonStreamFormat.JsonTextSequence)
             {
                 // The stream survives a bad document; the next MoveNext continues past it.
             }
