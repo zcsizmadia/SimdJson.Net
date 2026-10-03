@@ -148,6 +148,39 @@ public class FindFieldTests
     }
 
     [Test]
+    public async Task ObjectTryFindField_MissingOptionalFieldPreservesCursorForLaterField()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"first":1,"later":2}""");
+        using var obj = doc.GetObject();
+        using (var first = obj.FindField("first"))
+        {
+            await Assert.That(first.GetInt64()).IsEqualTo(1L);
+        }
+
+        var foundOptional = obj.TryFindField("optional", out var optional);
+        using var _ = optional;
+        await Assert.That(foundOptional).IsFalse();
+        await Assert.That(optional).IsNull();
+
+        using var later = obj.FindField("later");
+        await Assert.That(later.GetInt64()).IsEqualTo(2L);
+    }
+
+    [Test]
+    public async Task ObjectTryFindField_ExistingFieldAdvancesCursor()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("""{"first":1,"later":2}""");
+        using var obj = doc.GetObject();
+        var found = obj.TryFindField("first", out var first);
+        using var firstValue = first!;
+        await Assert.That(found).IsTrue();
+        await Assert.That(firstValue.GetInt64()).IsEqualTo(1L);
+
+        using var later = obj.FindField("later");
+        await Assert.That(later.GetInt64()).IsEqualTo(2L);
+    }
+
+    [Test]
     public async Task ValueFindField_OnObjectValue_ReturnsValue()
     {
         using var doc = SimdJsonParser.Shared.Parse("""{"config":{"enabled":true,"timeout":30}}""");

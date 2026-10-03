@@ -174,6 +174,39 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
         }
     }
 
+    /// <summary>
+    /// Searches forward for a field and restores the current scan position when the field is
+    /// missing, so a later lookup can continue without rescanning earlier fields.
+    /// </summary>
+    /// <remarks>
+    /// This is order-sensitive like <see cref="FindField"/>. A successful lookup advances the
+    /// object to the field value; consume that value before looking up a following field.
+    /// A miss leaves the object at the position it had before this call. The native position
+    /// snapshot is internal to this operation, so it cannot be reused with another object or
+    /// after a reset. Errors other than a missing field are propagated without restoring.
+    /// </remarks>
+    public unsafe bool TryFindField(string key, out JsonValue? value)
+    {
+        ThrowIfDisposed();
+        int maxBytes = Encoding.UTF8.GetMaxByteCount(key.Length) + 1;
+        Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
+        int len = Encoding.UTF8.GetBytes(key, buf);
+        buf[len] = 0;
+        fixed (byte* p = buf)
+        {
+            SimdJsonException.ThrowIfError(
+                NativeMethods.ObjectTryFindField(Handle, p, out nint h, out int found));
+            if (found == 0)
+            {
+                value = null;
+                return false;
+            }
+
+            value = new JsonValue(h, _owner);
+            return true;
+        }
+    }
+
     /// <summary>Returns <see langword="true"/> if the object has no fields.</summary>
     public bool IsEmpty()
     {

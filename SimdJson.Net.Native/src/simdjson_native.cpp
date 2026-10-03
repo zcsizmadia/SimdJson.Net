@@ -1188,6 +1188,37 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectFindField(
 
 // ─── Document rewind ─────────────────────────────────────────────────────────
 
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectTryFindField(
+    SimdJsonObject object, const char* key, SimdJsonValue* out_value, int32_t* out_found)
+{
+    CHECK_NULL(object);
+    CHECK_NULL(key);
+    CHECK_NULL(out_value);
+    CHECK_NULL(out_found);
+    auto* bo = static_cast<BridgeObject*>(object);
+    try {
+        const auto position = bo->object.get_current_position();
+        simdjson::ondemand::value value;
+        auto ec = bo->object.find_field(key).get(value);
+        if (ec == simdjson::NO_SUCH_FIELD) {
+            ec = bo->object.revert_position(position);
+            if (ec) return translate_error(ec);
+            *out_value = nullptr;
+            *out_found = 0;
+            return SIMDJSON_BRIDGE_SUCCESS;
+        }
+        if (ec) {
+            return translate_error(ec);
+        }
+
+        auto bv = std::make_unique<BridgeValue>();
+        bv->value = std::move(value);
+        *out_value = bv.release();
+        *out_found = 1;
+        return SIMDJSON_BRIDGE_SUCCESS;
+    } catch (...) { return SIMDJSON_BRIDGE_ERR_UNKNOWN; }
+}
+
 extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentRewind(SimdJsonDocument doc)
 {
     CHECK_NULL(doc);

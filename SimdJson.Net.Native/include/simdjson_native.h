@@ -482,6 +482,10 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueFindField(
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectFindField(
     SimdJsonObject object, const char* key, SimdJsonValue* out_value);
 
+/** Searches forward and restores the cursor if the field is missing. */
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ObjectTryFindField(
+    SimdJsonObject object, const char* key, SimdJsonValue* out_value, int32_t* out_found);
+
 // ─── Document rewind ─────────────────────────────────────────────────────────
 
 /** Rewinds the document iterator to the start. Allows re-reading the document. */

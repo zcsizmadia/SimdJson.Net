@@ -17,12 +17,13 @@ Represents a JSON object obtained from a parsed document. Wraps a forward-only O
 |--------|-------------|
 | `GetField(string)` / `this[string]` | Field by name — order-insensitive; can find fields appearing later in the document |
 | `FindField(string)` | Order-sensitive; searches forward from the current iterator position — use when accessing fields in declaration order |
+| `TryFindField(string, out JsonValue?)` | Order-sensitive optional lookup; restores its starting position if the field is missing |
 | `FindFieldUnordered(string)` | Alias for `GetField` (order-insensitive) |
 | `TryGetField(string, out JsonValue?)` | Non-throwing `GetField` |
 | `TryFindFieldUnordered(string, out JsonValue?)` | Non-throwing `FindFieldUnordered` |
 | `ContainsKey(string)` | Returns `true` if the key exists (does not return a value) |
 
-All field lookup methods return a [`JsonValue`](JsonValue.md) that **must be disposed**.
+Successful lookups return a [`JsonValue`](JsonValue.md) that **must be disposed**. The `Try` methods set the value to `null` when they return `false`.
 
 ## Iteration
 
@@ -107,9 +108,27 @@ foreach (var prop in obj)
 // FindField — order-sensitive, faster when field order matches JSON
 obj.Reset();
 using var h2 = obj.FindField("host"); // found because host comes first
+
+// Optional field lookup — a miss leaves the cursor where it started
+obj.Reset();
+using var hostAgain = obj.FindField("host");
+_ = hostAgain.GetString();
+if (obj.TryFindField("timeout", out var timeout))
+{
+    using (timeout) Console.WriteLine(timeout!.GetInt64());
+}
+else
+{
+    using var tls = obj.FindField("tls"); // still found after the miss
+    Console.WriteLine(tls.GetBool());
+}
 ```
 
-> **`GetField` vs `FindField`**: use `GetField` (or the indexer) for safety. Use `FindField` only when you know the field order matches the JSON and performance matters.
+`TryFindField` only restores the cursor when the key is absent. If found, it advances just like `FindField`; consume the returned value before reading a later sibling. Each found `JsonValue` must be disposed.
+
+The native position snapshot is created and consumed inside this call. No checkpoint token is exposed, so it cannot be applied to a different object or reused after `Reset()`. Errors other than a missing key propagate without restoring the cursor.
+
+> **`GetField` vs `FindField`**: use `GetField` (or the indexer) for order-insensitive access. Use `FindField` and `TryFindField` when reading fields in document order. A missing `TryFindField` does not rewind or rescan fields consumed before the call.
 
 ---
 
