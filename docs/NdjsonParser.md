@@ -59,7 +59,8 @@ public sealed class NdjsonParserOptions
     public bool SkipEmptyLines         { get; init; } // default: true
     public bool LeaveOpen              { get; init; } // default: false
     public int  BatchSize              { get; init; } // default: 0 = simdjson default (1 MB)
-    public bool AllowCommaSeparated    { get; init; } // default: false
+    public JsonStreamFormat StreamFormat { get; init; } // default: WhitespaceDelimited
+    public bool AllowCommaSeparated    { get; init; } // legacy alias for CommaDelimited
 }
 ```
 
@@ -73,7 +74,19 @@ public sealed class NdjsonParserOptions
 | `SkipEmptyLines` | When `true` (default), blank lines are skipped without error. |
 | `LeaveOpen` | When `true`, the input stream is not disposed when parsing ends. |
 | `BatchSize` | Bytes indexed at a time by `Parse`/`OpenStream`. `0` selects simdjson's default of 1 MB. Must exceed the largest single document, or that document cannot be parsed. Ignored by the `Stream` overloads. |
-| `AllowCommaSeparated` | When `true`, `Parse`/`OpenStream` also accept commas between documents, which lets a top-level JSON array be read as a stream of its elements. Ignored by the `Stream` overloads. |
+| `StreamFormat` | Separator mode for the in-memory `Parse`/`OpenStream` overloads: whitespace delimited by default, one-document-per-line fast path, RFC 7464 JSON text sequence, or comma-delimited documents. Ignored by the `Stream` overloads. |
+| `AllowCommaSeparated` | Compatibility alias for `StreamFormat = JsonStreamFormat.CommaDelimited`. Prefer `StreamFormat` in new code. |
+
+### JsonStreamFormat
+
+| Value | Input form and behavior |
+|-------|-------------------------|
+| `WhitespaceDelimited` | Whitespace-separated or concatenated JSON documents. This is the default and preserves existing behavior. |
+| `NewlineDelimited` | One complete JSON document per line. This opt-in mode lets simdjson skip an unread document remainder by advancing to the next line. Do not use it if a document can contain a raw newline. |
+| `JsonTextSequence` | RFC 7464 records, each beginning with the record separator character U+001E. A line feed after a record is allowed. |
+| `CommaDelimited` | Independent JSON documents separated by commas, for example `{"id":1},{"id":2}`. The commas are separators between documents. |
+
+All formats return zero documents for empty input. Parse errors are reported as `SimdJsonException`. Whitespace, newline, and comma-delimited streams can continue after a bad document, and `NdjsonParser.Parse` skips such errors by default. RFC 7464 malformed records are terminal: `JsonDocumentStream` must be disposed after the error, and `NdjsonParser.Parse` propagates the error even when `SkipMalformedLines` is `true` because simdjson cannot safely resume that iterator after a malformed sequence record.
 
 ## `JsonDocumentStream`
 
@@ -89,7 +102,10 @@ Returned by `OpenStream` for manual iteration, when you want per-document metada
 | `TruncatedBytes` | Bytes left unparsed at the end, usually an incomplete final document |
 
 ```csharp
-using var stream = NdjsonParser.OpenStream(ndjson);
+using var stream = NdjsonParser.OpenStream(ndjson, new NdjsonParserOptions
+{
+    StreamFormat = JsonStreamFormat.NewlineDelimited
+});
 while (stream.MoveNext())
 {
     using var id = stream.Current!.GetField("id");
@@ -105,6 +121,8 @@ if (stream.TruncatedBytes > 0)
 > `Current` **borrows** the stream's document. It is invalidated by the next `MoveNext()` and must not be stored. Disposing the stream disposes it too.
 
 > `TruncatedBytes` is only meaningful once you have read to the end with no document reporting an error. simdjson documents the value as arbitrary otherwise: it can exceed `SizeInBytes` or wrap around. To detect a truncated tail in other situations, track `CurrentIndex` of the last document you read successfully.
+
+Use `JsonStreamFormat.NewlineDelimited` only when each document occupies one line. It is an explicit input guarantee that allows the native iterator to skip an unread remainder by finding the next line feed. With `JsonStreamFormat.JsonTextSequence`, each record must start with U+001E; the optional line feed follows the JSON text.
 
 ### Errors in a stream
 
