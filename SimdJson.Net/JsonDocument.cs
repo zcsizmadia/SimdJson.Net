@@ -270,6 +270,46 @@ public sealed class JsonDocument : IDisposable
         return v;
     }
 
+    /// <summary>Gets the document root as a <see cref="float"/>, parsed directly from the JSON number. Throws if root is not a number or outside the float range.</summary>
+    public float GetFloat()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetFloat(Handle, out float v));
+        return v;
+    }
+
+    /// <summary>Gets the document root as an <see cref="sbyte"/>. Throws if it is not an integer or is outside the sbyte range.</summary>
+    public sbyte GetSByte()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetInt8(Handle, out sbyte v));
+        return v;
+    }
+
+    /// <summary>Gets the document root as a <see cref="byte"/>. Throws if it is not an unsigned integer or is outside the byte range.</summary>
+    public byte GetByte()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetUInt8(Handle, out byte v));
+        return v;
+    }
+
+    /// <summary>Gets the document root as a <see cref="short"/>. Throws if it is not an integer or is outside the short range.</summary>
+    public short GetInt16()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetInt16(Handle, out short v));
+        return v;
+    }
+
+    /// <summary>Gets the document root as a <see cref="ushort"/>. Throws if it is not an unsigned integer or is outside the ushort range.</summary>
+    public ushort GetUInt16()
+    {
+        ObjectDisposedException.ThrowIf(_disposed, this);
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetUInt16(Handle, out ushort v));
+        return v;
+    }
+
     /// <summary>Gets the document root as a <see cref="long"/>. Throws if root is not an integer.</summary>
     public long GetInt64()
     {

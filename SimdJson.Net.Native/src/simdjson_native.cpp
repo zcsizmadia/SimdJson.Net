@@ -537,6 +537,56 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetDouble(
     return translate_error(err);
 }
 
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetFloat(
+    SimdJsonValue value, float* out_val)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_val);
+    auto* bv = static_cast<BridgeValue*>(value);
+    auto err = bv->value.get_float().get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetInt8(
+    SimdJsonValue value, int8_t* out_val)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_val);
+    auto* bv = static_cast<BridgeValue*>(value);
+    auto err = bv->value.get_int8().get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetUInt8(
+    SimdJsonValue value, uint8_t* out_val)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_val);
+    auto* bv = static_cast<BridgeValue*>(value);
+    auto err = bv->value.get_uint8().get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetInt16(
+    SimdJsonValue value, int16_t* out_val)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_val);
+    auto* bv = static_cast<BridgeValue*>(value);
+    auto err = bv->value.get_int16().get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetUInt16(
+    SimdJsonValue value, uint16_t* out_val)
+{
+    CHECK_NULL(value);
+    CHECK_NULL(out_val);
+    auto* bv = static_cast<BridgeValue*>(value);
+    auto err = bv->value.get_uint16().get(*out_val);
+    return translate_error(err);
+}
+
 extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetInt64(
     SimdJsonValue value, int64_t* out_val)
 {
@@ -1870,6 +1920,56 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetDouble(
     CHECK_NULL(out_val);
     auto* bd = static_cast<BridgeDocument*>(doc);
     auto err = DOC_SCALAR(bd, get_double()).get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetFloat(
+    SimdJsonDocument doc, float* out_val)
+{
+    CHECK_NULL(doc);
+    CHECK_NULL(out_val);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    auto err = DOC_SCALAR(bd, get_float()).get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetInt8(
+    SimdJsonDocument doc, int8_t* out_val)
+{
+    CHECK_NULL(doc);
+    CHECK_NULL(out_val);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    auto err = DOC_SCALAR(bd, get_int8()).get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetUInt8(
+    SimdJsonDocument doc, uint8_t* out_val)
+{
+    CHECK_NULL(doc);
+    CHECK_NULL(out_val);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    auto err = DOC_SCALAR(bd, get_uint8()).get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetInt16(
+    SimdJsonDocument doc, int16_t* out_val)
+{
+    CHECK_NULL(doc);
+    CHECK_NULL(out_val);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    auto err = DOC_SCALAR(bd, get_int16()).get(*out_val);
+    return translate_error(err);
+}
+
+extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetUInt16(
+    SimdJsonDocument doc, uint16_t* out_val)
+{
+    CHECK_NULL(doc);
+    CHECK_NULL(out_val);
+    auto* bd = static_cast<BridgeDocument*>(doc);
+    auto err = DOC_SCALAR(bd, get_uint16()).get(*out_val);
     return translate_error(err);
 }
 

@@ -22,12 +22,16 @@ Represents a JSON value at a specific position in an On-Demand document. Can be 
 | `GetStringSpan()` | As `ReadOnlySpan<byte>` — zero allocation |
 | `GetStringSpan(bool allowReplacement)` | Zero-allocation span with optional lone-surrogate replacement |
 | `GetDouble()` | As `double` |
-| `GetFloat()` | As `float` |
+| `GetFloat()` | As `float`, parsed directly from the JSON number to single precision |
 | `GetDecimal()` | As `decimal`, parsed from the raw token so precision beyond `double` is kept |
 | `GetInt64()` | As `long` |
 | `GetUInt64()` | As `ulong` |
 | `GetInt32()` | As `int` (throws if not int32 or overflows) |
 | `GetUInt32()` | As `uint` (throws if not uint32 or overflows) |
+| `GetSByte()` | As `sbyte` (throws if not int8 or overflows) |
+| `GetByte()` | As `byte` (throws if not uint8 or overflows) |
+| `GetInt16()` | As `short` (throws if not int16 or overflows) |
+| `GetUInt16()` | As `ushort` (throws if not uint16 or overflows) |
 | `GetBool()` | As `bool` |
 
 ## Container access
@@ -98,6 +102,10 @@ Each returns `false` instead of throwing when the value is not of the requested 
 | `TryGetUInt64(out ulong)` | Non-throwing `GetUInt64` |
 | `TryGetInt32(out int)` | Non-throwing `GetInt32`; also `false` on overflow |
 | `TryGetUInt32(out uint)` | Non-throwing `GetUInt32`; also `false` on overflow |
+| `TryGetSByte(out sbyte)` | Non-throwing `GetSByte`; also `false` on overflow |
+| `TryGetByte(out byte)` | Non-throwing `GetByte`; also `false` on overflow |
+| `TryGetInt16(out short)` | Non-throwing `GetInt16`; also `false` on overflow |
+| `TryGetUInt16(out ushort)` | Non-throwing `GetUInt16`; also `false` on overflow |
 | `TryGetDouble(out double)` | Non-throwing `GetDouble` |
 | `TryGetFloat(out float)` | Non-throwing `GetFloat` |
 | `TryGetBool(out bool)` | Non-throwing `GetBool` |

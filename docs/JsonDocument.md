@@ -85,10 +85,15 @@ Use when the JSON document root is a bare scalar value (e.g. `"hello"`, `42`, `t
 | `GetBool()` | Root as `bool` |
 | `IsNull()` | `true` when the root is `null` |
 | `GetDouble()` | Root as `double` |
+| `GetFloat()` | Root as `float`, parsed directly from the JSON number to single precision |
 | `GetInt64()` | Root as `long` |
 | `GetUInt64()` | Root as `ulong` |
 | `GetInt32()` | Root as `int`; throws error `-10` if the value does not fit |
 | `GetUInt32()` | Root as `uint`; throws error `-10` if the value does not fit |
+| `GetSByte()` | Root as `sbyte`; throws error `-10` if outside [-128, 127] |
+| `GetByte()` | Root as `byte`; throws error `-10` if outside [0, 255] |
+| `GetInt16()` | Root as `short`; throws error `-10` if outside [-32768, 32767] |
+| `GetUInt16()` | Root as `ushort`; throws error `-10` if outside [0, 65535] |
 | `GetDoubleInString()` | Parse a `double` out of a root JSON string (e.g. `"3.14"`) |
 | `GetInt64InString()` | Parse a `long` out of a root JSON string (e.g. `"-99"`) |
 | `GetUInt64InString()` | Parse a `ulong` out of a root JSON string (e.g. `"100"`) |

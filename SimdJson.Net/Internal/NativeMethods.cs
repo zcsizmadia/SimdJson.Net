@@ -135,6 +135,26 @@ internal static unsafe partial class NativeMethods
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int ValueGetDouble(nint value, out double outVal);
 
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetFloat")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetFloat(nint value, out float outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetInt8")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetInt8(nint value, out sbyte outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetUInt8")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetUInt8(nint value, out byte outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetInt16")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetInt16(nint value, out short outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetUInt16")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ValueGetUInt16(nint value, out ushort outVal);
+
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetInt64")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int ValueGetInt64(nint value, out long outVal);
@@ -527,6 +547,26 @@ internal static unsafe partial class NativeMethods
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetDouble")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int DocumentGetDouble(nint doc, out double outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetFloat")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetFloat(nint doc, out float outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetInt8")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetInt8(nint doc, out sbyte outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetUInt8")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetUInt8(nint doc, out byte outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetInt16")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetInt16(nint doc, out short outVal);
+
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetUInt16")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int DocumentGetUInt16(nint doc, out ushort outVal);
 
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetInt64")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]

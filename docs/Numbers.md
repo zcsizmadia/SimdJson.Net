@@ -11,6 +11,10 @@ Returned by `JsonValue.GetNumberType()` to identify the sub-type of a JSON numbe
 | `UnsignedInteger` | A `ulong` ≥ 2⁶³ (e.g. `10000000000000000000`) | `GetUInt64()` |
 | `BigInteger` | An integer outside the 64-bit range — read via `GetRawJsonToken()` | — |
 
+Use `GetFloat()` when single precision is sufficient. It parses the JSON number directly to
+`float`, avoiding an intermediate `double` rounding step. `GetDouble()` continues to return a
+binary64 value.
+
 ### Example
 
 ```csharp
