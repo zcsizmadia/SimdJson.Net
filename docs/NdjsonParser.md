@@ -20,6 +20,7 @@ NDJSON (also known as JSON Lines) is a format where each line of a text stream i
 |--------|-------------|
 | `Parse<T>(ReadOnlySpan<byte>, Func<JsonDocument, T>, NdjsonParserOptions?)` | Projects every document, returning results in order |
 | `OpenStream(ReadOnlySpan<byte>, NdjsonParserOptions?)` | Returns a [`JsonDocumentStream`](#jsondocumentstream) for manual iteration |
+| `SliceAt(ReadOnlyMemory<byte>, byte, int, int)` | Returns a non-copying document-aligned range for independent parsing |
 
 ### Which family to use
 
@@ -39,6 +40,41 @@ List<long> ids = NdjsonParser.Parse(ndjson, doc =>
 // Too large to hold, or arriving over the network: stream it
 await foreach (var id in NdjsonParser.ParseAsync(httpStream, selector)) { }
 ```
+
+### Parallel parsing of an in-memory stream
+
+For newline-delimited JSON or RFC 7464 JSON text sequences, `SliceAt` divides the input into
+contiguous, non-overlapping ranges at delimiter boundaries. Each non-empty range can be parsed
+independently on a worker thread:
+
+```csharp
+byte[] ndjson = File.ReadAllBytes("events.ndjson");
+const int blockSize = 1 << 20;
+int sliceCount = (ndjson.Length + blockSize - 1) / blockSize;
+long total = 0;
+
+Parallel.For(0, sliceCount, index =>
+{
+    ReadOnlyMemory<byte> slice = NdjsonParser.SliceAt(ndjson, (byte)'\n', blockSize, index);
+    if (slice.IsEmpty)
+        return;
+
+    long localTotal = NdjsonParser.Parse(slice.Span, doc =>
+    {
+        using var id = doc.GetField("id");
+        return id.GetInt64();
+    }, new NdjsonParserOptions { StreamFormat = JsonStreamFormat.NewlineDelimited }).Sum();
+    Interlocked.Add(ref total, localTotal);
+});
+```
+
+`SliceAt` takes the delimiter byte (`'\n'` for NDJSON or `0x1E` for JSON text sequences), a
+positive nominal block size, and a zero-based slice index. Set the block size above the longest
+document. If a document is longer, blocks falling inside it return empty; continue checking later
+indices instead of stopping at the first empty result. The delimiter must not occur inside a JSON
+document. Results are `ReadOnlyMemory<byte>` views over the original input, so retain and do not
+dispose any custom memory owner until all workers finish. `NdjsonParser.Parse` creates an independent
+parser for each slice.
 
 ### Reading root scalars
 

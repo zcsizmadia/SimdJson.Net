@@ -15,6 +15,80 @@ public class DocumentStreamTests
     }
 
     [Test]
+    public async Task SliceAt_ReturnsNonOverlappingDocumentAlignedSlicesThatParseIndependently()
+    {
+        byte[] input = Utf8("{\"id\":1}\n{\"id\":2}\n{\"id\":3}\n{\"id\":4}\n");
+        const int blockSize = 10;
+        var values = new List<long>();
+        for (int index = 0; (long)index * blockSize < input.Length; index++)
+        {
+            ReadOnlyMemory<byte> slice = NdjsonParser.SliceAt(input, (byte)'\n', blockSize, index);
+            if (slice.IsEmpty)
+            {
+                continue;
+            }
+
+            values.AddRange(NdjsonParser.Parse(slice.Span, SelectId,
+                new NdjsonParserOptions { StreamFormat = JsonStreamFormat.NewlineDelimited }));
+        }
+
+        await Assert.That(values).IsEquivalentTo(new long[] { 1, 2, 3, 4 });
+    }
+
+    [Test]
+    public async Task SliceAt_LongDocumentMayProduceEmptySliceAndLaterSlicesRemainAvailable()
+    {
+        byte[] input = Utf8("{\"id\":1,\"padding\":\"abcdefghijk\"}\n{\"id\":2}\n");
+        ReadOnlyMemory<byte> first = NdjsonParser.SliceAt(input, (byte)'\n', 8, 0);
+        ReadOnlyMemory<byte> insideLongDocument = NdjsonParser.SliceAt(input, (byte)'\n', 8, 1);
+        ReadOnlyMemory<byte> afterLongDocument = NdjsonParser.SliceAt(input, (byte)'\n', 8, 4);
+
+        await Assert.That(first.IsEmpty).IsFalse();
+        await Assert.That(insideLongDocument.IsEmpty).IsTrue();
+        await Assert.That(afterLongDocument.IsEmpty).IsFalse();
+        using var parser = new SimdJsonParser();
+        using var doc = parser.Parse(afterLongDocument.Span);
+        await Assert.That(SelectId(doc)).IsEqualTo(2L);
+    }
+
+    [Test]
+    public async Task SliceAt_JsonTextSequenceUsesRecordSeparator()
+    {
+        byte[] input = Utf8("\u001e{\"id\":1}\n\u001e{\"id\":2}\n");
+        ReadOnlyMemory<byte> slice = NdjsonParser.SliceAt(input, 0x1e, 10, 0);
+        var values = new List<long>();
+        for (int index = 0; (long)index * 10 < input.Length; index++)
+        {
+            ReadOnlyMemory<byte> part = NdjsonParser.SliceAt(input, 0x1e, 10, index);
+            if (!part.IsEmpty)
+            {
+                values.AddRange(NdjsonParser.Parse(part.Span, SelectId,
+                    new NdjsonParserOptions { StreamFormat = JsonStreamFormat.JsonTextSequence }));
+            }
+        }
+
+        await Assert.That(Encoding.UTF8.GetString(slice.Span)).IsEqualTo("\u001e{\"id\":1}\n\u001e");
+        await Assert.That(values).IsEquivalentTo(new long[] { 1, 2 });
+    }
+
+    [Test]
+    public async Task SliceAt_RejectsInvalidBlockSizeAndIndex()
+    {
+        byte[] input = Utf8("{}\n");
+        await Assert.That(() => NdjsonParser.SliceAt(input, (byte)'\n', 0, 0))
+            .Throws<ArgumentOutOfRangeException>();
+        await Assert.That(() => NdjsonParser.SliceAt(input, (byte)'\n', 1, -1))
+            .Throws<ArgumentOutOfRangeException>();
+    }
+
+    [Test]
+    public async Task SliceAt_EmptyInputReturnsEmptyMemory()
+    {
+        await Assert.That(NdjsonParser.SliceAt(ReadOnlyMemory<byte>.Empty, (byte)'\n', 4, 0).IsEmpty)
+            .IsTrue();
+    }
+
+    [Test]
     public async Task Parse_ProjectsEveryDocumentInOrder()
     {
         var ids = NdjsonParser.Parse(

@@ -259,6 +259,17 @@ using var sequence = NdjsonParser.OpenStream(jsonTextSequence, new NdjsonParserO
 {
     StreamFormat = JsonStreamFormat.JsonTextSequence
 });
+
+// Divide NDJSON into independent, non-copying ranges for parallel parsing.
+const int blockSize = 1 << 20;
+for (int i = 0; (long)i * blockSize < ndjson.Length; i++)
+{
+    ReadOnlyMemory<byte> slice = NdjsonParser.SliceAt(ndjson, (byte)'\n', blockSize, i);
+    if (!slice.IsEmpty)
+    {
+        // Parse each slice with its own parser, for example inside Parallel.For.
+    }
+}
 ```
 
 See [NdjsonParser](NdjsonParser.md) for the full reference.
