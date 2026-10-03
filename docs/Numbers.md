@@ -9,7 +9,9 @@ Returned by `JsonValue.GetNumberType()` to identify the sub-type of a JSON numbe
 | `FloatingPoint` | A `double` (e.g. `3.14`, `1e10`) | `GetDouble()` |
 | `SignedInteger` | A `long` in the range [−2⁶³, 2⁶³−1] (e.g. `−42`, `0`) | `GetInt64()` |
 | `UnsignedInteger` | A `ulong` ≥ 2⁶³ (e.g. `10000000000000000000`) | `GetUInt64()` |
-| `BigInteger` | An integer outside the 64-bit range — read via `GetRawJsonToken()` | — |
+| `BigInteger` | An integer outside the 64-bit range, including positive values from `2^64` through `10^20 - 1` with simdjson 5 — read via `GetRawJsonToken()` | — |
+
+Big integers are classified and preserved as JSON number tokens; the library does not convert them to `System.Numerics.BigInteger`. Use the raw-token accessor to retain all decimal digits. For a root number, use `JsonDocument.GetRawJsonToken()` or `GetRawJsonTokenSpan()`.
 
 ### Example
 
@@ -46,10 +48,10 @@ A tagged-union value type returned by `JsonValue.GetNumber()`. Retrieves both th
 | `AsDouble()` | Value as `double` — works for `FloatingPoint`, `SignedInteger`, and `UnsignedInteger`; throws `InvalidOperationException` for `BigInteger` |
 | `AsInt64()` | Value as `long` — meaningful only for `SignedInteger` |
 | `AsUInt64()` | Value as `ulong` — meaningful only for `UnsignedInteger` |
-| `ToString()` | Decimal string representation |
+| `ToString()` | Decimal representation for supported numeric values; returns `big_integer` for `BigInteger` because `JsonNumber` does not store its digits |
 
 > For a `BigInteger`, `GetNumber()` succeeds and reports the type, but carries no numeric value —
-> read the digits with `JsonValue.GetRawJsonToken()`.
+> read the digits with `JsonValue.GetRawJsonToken()` (or `JsonDocument.GetRawJsonToken()` for a root number).
 
 ### Example
 
@@ -60,6 +62,16 @@ JsonNumber num = val.GetNumber();
 Console.WriteLine(num.NumberType); // FloatingPoint
 Console.WriteLine(num.AsDouble()); // 9.99
 Console.WriteLine(num.ToString()); // 9.99
+```
+
+For a root big integer, preserve the exact digits from the document:
+
+```csharp
+using var doc = SimdJsonParser.Shared.Parse("18446744073709551616");
+if (doc.GetNumberType() == JsonNumberType.BigInteger)
+{
+    string exactDigits = doc.GetRawJsonToken();
+}
 ```
 
 ### `IsNegative` / `IsInteger`

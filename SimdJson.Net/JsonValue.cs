@@ -566,7 +566,7 @@ public sealed class JsonValue : IDisposable
     /// Returns the full typed number value in a single call as a <see cref="JsonNumber"/>.
     /// Avoids the need to call <see cref="GetNumberType"/> and a separate getter.
     /// For <see cref="JsonNumberType.BigInteger"/> numbers, use <see cref="GetRawJsonToken"/>
-    /// to retrieve the decimal string representation.
+    /// to retrieve the exact decimal token; big integers are not converted to a managed numeric type.
     /// </summary>
     public JsonNumber GetNumber()
     {

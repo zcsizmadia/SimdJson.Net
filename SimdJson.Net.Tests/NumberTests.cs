@@ -99,6 +99,44 @@ public class NumberTypeTests
     }
 }
 
+public class BigIntegerTests
+{
+    [Test]
+    [Arguments("18446744073709551616")]
+    [Arguments("99999999999999999999")]
+    public async Task NestedBigInteger_BoundaryRange_PreservesTypeAndDigits(string json)
+    {
+        using var doc = SimdJsonParser.Shared.Parse($$"""{"value":{{json}}}""");
+        using var value = doc.GetField("value");
+
+        await Assert.That(value.GetNumberType()).IsEqualTo(JsonNumberType.BigInteger);
+        await Assert.That(value.GetNumber().NumberType).IsEqualTo(JsonNumberType.BigInteger);
+        await Assert.That(value.GetRawJsonToken()).IsEqualTo(json);
+    }
+
+    [Test]
+    [Arguments("18446744073709551616")]
+    [Arguments("99999999999999999999")]
+    public async Task RootBigInteger_BoundaryRange_PreservesTypeAndDigits(string json)
+    {
+        using var doc = SimdJsonParser.Shared.Parse(json);
+
+        await Assert.That(doc.GetNumberType()).IsEqualTo(JsonNumberType.BigInteger);
+        await Assert.That(doc.GetNumber().NumberType).IsEqualTo(JsonNumberType.BigInteger);
+        await Assert.That(doc.GetRawJsonToken()).IsEqualTo(json);
+    }
+
+    [Test]
+    public async Task RootBigInteger_AtUInt64Boundary_RemainsUnsignedInteger()
+    {
+        const string json = "18446744073709551615";
+        using var doc = SimdJsonParser.Shared.Parse(json);
+
+        await Assert.That(doc.GetNumberType()).IsEqualTo(JsonNumberType.UnsignedInteger);
+        await Assert.That(doc.GetUInt64()).IsEqualTo(ulong.MaxValue);
+    }
+}
+
 // ─── Raw JSON tests ──────────────────────────────────────────────────────────
 
 public class NumberInStringTests

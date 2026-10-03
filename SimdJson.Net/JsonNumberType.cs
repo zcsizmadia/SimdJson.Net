@@ -17,7 +17,9 @@ public enum JsonNumberType
 
     /// <summary>
     /// An integer outside the 64-bit range.
-    /// Use <see cref="JsonValue.GetRawJsonToken"/> to read it as text.
+    /// simdjson 5 also recognizes positive integers from 2^64 through 10^20 - 1 as big integers.
+    /// Use <see cref="JsonValue.GetRawJsonToken"/> or <see cref="JsonDocument.GetRawJsonToken"/>
+    /// to retrieve the exact decimal token; the value is not converted to <see cref="System.Numerics.BigInteger"/>.
     /// </summary>
     BigInteger = 3
 }

@@ -78,6 +78,7 @@ doc.TryAtPointer("/optional", out var v);
 ```csharp
 JsonNumber n = val.GetNumber();
 // n.NumberType, n.AsDouble(), n.AsInt64(), n.AsUInt64()
+// For BigInteger, use val.GetRawJsonToken() to preserve every digit.
 ```
 
 ### Utilities

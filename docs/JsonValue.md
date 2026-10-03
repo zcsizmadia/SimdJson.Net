@@ -61,6 +61,8 @@ Prefer `GetNumber()` when you need both the type and the value in one call.
 | `IsInteger()` | `true` if the number has no fractional part |
 | `GetNumber()` | Full typed number as [`JsonNumber`](Numbers.md#jsonnumber) struct |
 
+When the type is `BigInteger`, use `GetRawJsonToken()` to preserve the exact decimal digits. With simdjson 5 this includes positive integer values from `2^64` through `10^20 - 1`. The value is not converted to `System.Numerics.BigInteger`; see [Numbers.md](Numbers.md) for details.
+
 ## Numbers in strings
 
 For JSON APIs that encode numbers as quoted strings (e.g. `"price": "9.99"`).
