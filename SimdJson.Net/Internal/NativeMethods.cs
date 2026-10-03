@@ -328,6 +328,10 @@ internal static unsafe partial class NativeMethods
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
     internal static partial int ObjectFindField(nint obj, byte* key, out nint outValue);
 
+    [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ObjectTryFindField")]
+    [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
+    internal static partial int ObjectTryFindField(nint obj, byte* key, out nint outValue, out int found);
+
     // ── Document rewind ───────────────────────────────────────────────────
 
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentRewind")]
