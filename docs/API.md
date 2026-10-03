@@ -136,10 +136,15 @@ string  s = doc.GetString();
 bool    b = doc.GetBool();
 bool    n = doc.IsNull();
 double  d = doc.GetDouble();
+float   f = doc.GetFloat();       // parsed directly to single precision
 long    i = doc.GetInt64();
 ulong   u = doc.GetUInt64();
 int     i32 = doc.GetInt32();
 uint    u32 = doc.GetUInt32();
+sbyte   i8 = doc.GetSByte();
+byte    u8 = doc.GetByte();
+short   i16 = doc.GetInt16();
+ushort  u16 = doc.GetUInt16();
 
 // Trailing content after a root array or object
 bool clean = doc.AtEnd();   // check after fully consuming the root
@@ -153,13 +158,18 @@ double d = doc.GetDoubleInString();
 using var val = doc.At(2);   // 0-based index
 ```
 
-### 32-bit integers
+### Integer getters
 
 ```csharp
 int  i = val.GetInt32();             // throws if not int32 or overflow
 uint u = val.GetUInt32();            // throws if not uint32 or overflow
+sbyte i8 = val.GetSByte();           // throws if not int8 or overflow
+byte u8 = val.GetByte();             // throws if not uint8 or overflow
+short i16 = val.GetInt16();          // throws if not int16 or overflow
+ushort u16 = val.GetUInt16();        // throws if not uint16 or overflow
 val.TryGetInt32(out int  v);         // returns false on type mismatch or overflow
 val.TryGetUInt32(out uint v);        // returns false on type mismatch or overflow
+val.TryGetSByte(out sbyte v8);       // narrow getters also have TryGet variants
 ```
 
 ### Wildcard path iteration

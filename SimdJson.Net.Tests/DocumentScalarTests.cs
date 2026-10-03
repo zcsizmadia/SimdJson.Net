@@ -76,6 +76,77 @@ public class DocumentInt32Tests
     }
 }
 
+public class DocumentNarrowNumberTests
+{
+    [Test]
+    [Arguments("-128", (sbyte)-128)]
+    [Arguments("127", (sbyte)127)]
+    public async Task GetSByte_Boundaries_ReturnValues(string json, sbyte expected)
+    {
+        using var doc = SimdJsonParser.Shared.Parse(json);
+        await Assert.That(doc.GetSByte()).IsEqualTo(expected);
+    }
+
+    [Test]
+    [Arguments("0", (byte)0)]
+    [Arguments("255", (byte)255)]
+    public async Task GetByte_Boundaries_ReturnValues(string json, byte expected)
+    {
+        using var doc = SimdJsonParser.Shared.Parse(json);
+        await Assert.That(doc.GetByte()).IsEqualTo(expected);
+    }
+
+    [Test]
+    [Arguments("-32768", (short)-32768)]
+    [Arguments("32767", (short)32767)]
+    public async Task GetInt16_Boundaries_ReturnValues(string json, short expected)
+    {
+        using var doc = SimdJsonParser.Shared.Parse(json);
+        await Assert.That(doc.GetInt16()).IsEqualTo(expected);
+    }
+
+    [Test]
+    [Arguments("0", (ushort)0)]
+    [Arguments("65535", (ushort)65535)]
+    public async Task GetUInt16_Boundaries_ReturnValues(string json, ushort expected)
+    {
+        using var doc = SimdJsonParser.Shared.Parse(json);
+        await Assert.That(doc.GetUInt16()).IsEqualTo(expected);
+    }
+
+    [Test]
+    public async Task NarrowRootGetters_RejectOutOfRangeAndWrongTypes()
+    {
+        using var tooLargeParser = new SimdJsonParser();
+        using var tooLarge = tooLargeParser.Parse("128");
+        using var negativeParser = new SimdJsonParser();
+        using var negative = negativeParser.Parse("-1");
+        using var fractionParser = new SimdJsonParser();
+        using var fraction = fractionParser.Parse("1.5");
+        await Assert.That(() => tooLarge.GetSByte()).Throws<SimdJsonException>();
+        await Assert.That(() => negative.GetByte()).Throws<SimdJsonException>();
+        await Assert.That(() => fraction.GetInt16()).Throws<SimdJsonException>();
+    }
+
+    [Test]
+    public async Task GetFloat_ParsesDirectlyFromRootToken()
+    {
+        using var doc = SimdJsonParser.Shared.Parse("1.000000059604644775390626");
+        await Assert.That(BitConverter.SingleToInt32Bits(doc.GetFloat())).IsEqualTo(0x3F800001);
+    }
+
+    [Test]
+    public async Task GetFloat_RejectsWrongTypeAndOverflow()
+    {
+        using var textParser = new SimdJsonParser();
+        using var text = textParser.Parse("\"1.5\"");
+        using var overflowParser = new SimdJsonParser();
+        using var overflow = overflowParser.Parse("1e39");
+        await Assert.That(() => text.GetFloat()).Throws<SimdJsonException>();
+        await Assert.That(() => overflow.GetFloat()).Throws<SimdJsonException>();
+    }
+}
+
 // ─── JsonDocument.AtEnd ───────────────────────────────────────────────────────
 
 public class DocumentAtEndTests

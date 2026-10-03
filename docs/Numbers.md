@@ -13,6 +13,10 @@ Returned by `JsonValue.GetNumberType()` to identify the sub-type of a JSON numbe
 
 Big integers are classified and preserved as JSON number tokens; the library does not convert them to `System.Numerics.BigInteger`. Use the raw-token accessor to retain all decimal digits. For a root number, use `JsonDocument.GetRawJsonToken()` or `GetRawJsonTokenSpan()`.
 
+Use `GetFloat()` when single precision is sufficient. It parses the JSON number directly to
+`float`, avoiding an intermediate `double` rounding step. `GetDouble()` continues to return a
+binary64 value.
+
 ### Example
 
 ```csharp

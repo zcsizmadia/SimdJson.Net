@@ -175,8 +175,45 @@ public sealed class JsonValue : IDisposable
         return v;
     }
 
-    /// <summary>Gets the value as a <see cref="float"/>. Throws if not a number.</summary>
-    public float GetFloat() => (float)GetDouble();
+    /// <summary>Gets the value as a <see cref="float"/>, parsed directly from the JSON number. Throws if not a number or outside the float range.</summary>
+    public float GetFloat()
+    {
+        ThrowIfDisposed();
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetFloat(Handle, out float v));
+        return v;
+    }
+
+    /// <summary>Gets the value as an <see cref="sbyte"/>. Throws if it is not an integer or is outside the sbyte range.</summary>
+    public sbyte GetSByte()
+    {
+        ThrowIfDisposed();
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetInt8(Handle, out sbyte v));
+        return v;
+    }
+
+    /// <summary>Gets the value as a <see cref="byte"/>. Throws if it is not an unsigned integer or is outside the byte range.</summary>
+    public byte GetByte()
+    {
+        ThrowIfDisposed();
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetUInt8(Handle, out byte v));
+        return v;
+    }
+
+    /// <summary>Gets the value as a <see cref="short"/>. Throws if it is not an integer or is outside the short range.</summary>
+    public short GetInt16()
+    {
+        ThrowIfDisposed();
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetInt16(Handle, out short v));
+        return v;
+    }
+
+    /// <summary>Gets the value as a <see cref="ushort"/>. Throws if it is not an unsigned integer or is outside the ushort range.</summary>
+    public ushort GetUInt16()
+    {
+        ThrowIfDisposed();
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetUInt16(Handle, out ushort v));
+        return v;
+    }
 
     /// <summary>
     /// Gets the value as a <see cref="decimal"/>, parsed from the raw JSON token so that
@@ -250,6 +287,34 @@ public sealed class JsonValue : IDisposable
     public bool TryGetUInt32(out uint value)
     {
         try { value = GetUInt32(); return true; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = default; return false; }
+    }
+
+    /// <summary>Tries to get the value as an <see cref="sbyte"/>. Returns <see langword="false"/> if it is not an integer or overflows.</summary>
+    public bool TryGetSByte(out sbyte value)
+    {
+        try { value = GetSByte(); return true; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = default; return false; }
+    }
+
+    /// <summary>Tries to get the value as a <see cref="byte"/>. Returns <see langword="false"/> if it is not an unsigned integer or overflows.</summary>
+    public bool TryGetByte(out byte value)
+    {
+        try { value = GetByte(); return true; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = default; return false; }
+    }
+
+    /// <summary>Tries to get the value as a <see cref="short"/>. Returns <see langword="false"/> if it is not an integer or overflows.</summary>
+    public bool TryGetInt16(out short value)
+    {
+        try { value = GetInt16(); return true; }
+        catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = default; return false; }
+    }
+
+    /// <summary>Tries to get the value as a <see cref="ushort"/>. Returns <see langword="false"/> if it is not an unsigned integer or overflows.</summary>
+    public bool TryGetUInt16(out ushort value)
+    {
+        try { value = GetUInt16(); return true; }
         catch (SimdJsonException ex) when (SimdJsonException.IsTypeMismatch(ex.ErrorCode)) { value = default; return false; }
     }
 

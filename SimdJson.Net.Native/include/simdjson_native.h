@@ -270,6 +270,21 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetString(
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetDouble(
     SimdJsonValue value, double* out_val);
 
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetFloat(
+    SimdJsonValue value, float* out_val);
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetInt8(
+    SimdJsonValue value, int8_t* out_val);
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetUInt8(
+    SimdJsonValue value, uint8_t* out_val);
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetInt16(
+    SimdJsonValue value, int16_t* out_val);
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetUInt16(
+    SimdJsonValue value, uint16_t* out_val);
+
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetInt64(
     SimdJsonValue value, int64_t* out_val);
 
@@ -766,6 +781,21 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentIsNull(
     SimdJsonDocument doc, int32_t* out_is_null);
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetDouble(
     SimdJsonDocument doc, double* out_val);
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetFloat(
+    SimdJsonDocument doc, float* out_val);
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetInt8(
+    SimdJsonDocument doc, int8_t* out_val);
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetUInt8(
+    SimdJsonDocument doc, uint8_t* out_val);
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetInt16(
+    SimdJsonDocument doc, int16_t* out_val);
+
+SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetUInt16(
+    SimdJsonDocument doc, uint16_t* out_val);
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetInt64(
     SimdJsonDocument doc, int64_t* out_val);
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetUInt64(
