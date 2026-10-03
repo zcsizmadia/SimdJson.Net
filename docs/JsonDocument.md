@@ -107,6 +107,8 @@ Available when the document root is a number. See [Numbers.md](Numbers.md) for `
 | `GetRawJsonToken()` | Raw token text of the root as a `string` |
 | `GetRawJsonTokenSpan()` | Raw token as a `ReadOnlySpan<byte>` — zero allocation |
 
+For a root whose `GetNumberType()` is `BigInteger`, use `GetRawJsonToken()` to preserve the exact decimal digits. This includes positive values from `2^64` through `10^20 - 1` when using simdjson 5. The library does not materialize these values as `System.Numerics.BigInteger`.
+
 ## Counting
 
 | Member | Description |

@@ -409,7 +409,8 @@ public sealed class JsonDocument : IDisposable
 
     /// <summary>
     /// Gets the full typed number from the document root in a single call.
-    /// For <see cref="JsonNumberType.BigInteger"/> values, use <see cref="GetRawJsonToken"/> to retrieve the decimal string.
+    /// For <see cref="JsonNumberType.BigInteger"/> values, use <see cref="GetRawJsonToken"/> to retrieve the exact decimal token;
+    /// big integers are not converted to a managed numeric type.
     /// </summary>
     public JsonNumber GetNumber()
     {
