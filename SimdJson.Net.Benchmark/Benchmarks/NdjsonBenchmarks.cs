@@ -85,4 +85,35 @@ public class NdjsonBenchmarks
 
         return sum;
     }
+
+    /// <summary>Splits the in-memory input at document boundaries and parses slices in parallel.</summary>
+    [Benchmark(Description = "Parallel slices")]
+    public long ParallelSlices()
+    {
+        const int blockSize = 256 * 1024;
+        int sliceCount = (_ndjson.Length + blockSize - 1) / blockSize;
+        long total = 0;
+        Parallel.For(
+            0,
+            sliceCount,
+            () => 0L,
+            (index, _, sum) =>
+            {
+                ReadOnlyMemory<byte> slice = NdjsonParser.SliceAt(
+                    _ndjson, (byte)'\n', blockSize, index);
+                if (!slice.IsEmpty)
+                {
+                    foreach (long id in NdjsonParser.Parse(slice.Span, SelectId,
+                        new NdjsonParserOptions { StreamFormat = JsonStreamFormat.NewlineDelimited }))
+                    {
+                        sum += id;
+                    }
+                }
+
+                return sum;
+            },
+            sum => Interlocked.Add(ref total, sum));
+
+        return total;
+    }
 }

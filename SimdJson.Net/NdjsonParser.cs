@@ -134,6 +134,55 @@ public static class NdjsonParser
     // ── In-memory batching API (simdjson iterate_many) ────────────────────────
 
     /// <summary>
+    /// Returns the zero-based, document-aligned slice of a delimited in-memory stream.
+    /// Use this to divide newline-delimited JSON or RFC 7464 JSON text sequences into
+    /// independent ranges that can be parsed concurrently.
+    /// </summary>
+    /// <param name="input">The complete stream. The returned memory refers to this same storage.</param>
+    /// <param name="delimiter">The separator byte, normally line feed or RFC 7464 record separator (0x1E).</param>
+    /// <param name="blockSize">Nominal size in bytes for each slice; must be positive and should exceed the longest document.</param>
+    /// <param name="index">Zero-based slice index.</param>
+    /// <returns>A contiguous, non-overlapping slice, or empty when this block falls inside a document longer than <paramref name="blockSize"/>.</returns>
+    /// <remarks>
+    /// The delimiter must not occur inside a document. Empty slices are possible when a document
+    /// is longer than the block size; continue checking later indices. The returned
+    /// <see cref="ReadOnlyMemory{T}"/> keeps the input storage reachable but does not copy it.
+    /// Keep the input's underlying memory manager alive and undisposed while parsing slices.
+    /// Each non-empty result can be passed to a separate <see cref="SimdJsonParser"/> instance.
+    /// </remarks>
+    public static ReadOnlyMemory<byte> SliceAt(
+        ReadOnlyMemory<byte> input,
+        byte delimiter,
+        int blockSize,
+        int index)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegativeOrZero(blockSize);
+        ArgumentOutOfRangeException.ThrowIfNegative(index);
+
+        int length = input.Length;
+        if ((long)index * blockSize >= length)
+        {
+            return ReadOnlyMemory<byte>.Empty;
+        }
+
+        int rawBegin = index * blockSize;
+        int begin = rawBegin == 0 ? 0 : SnapToDelimiter(input.Span, delimiter, rawBegin);
+        int end = SnapToDelimiter(input.Span, delimiter, (int)Math.Min((long)rawBegin + blockSize, int.MaxValue));
+        return begin >= end ? ReadOnlyMemory<byte>.Empty : input.Slice(begin, end - begin);
+    }
+
+    private static int SnapToDelimiter(ReadOnlySpan<byte> input, byte delimiter, int offset)
+    {
+        if (offset >= input.Length)
+        {
+            return input.Length;
+        }
+
+        int delimiterOffset = input[offset..].IndexOf(delimiter);
+        return delimiterOffset < 0 ? input.Length : offset + delimiterOffset + 1;
+    }
+
+    /// <summary>
     /// Opens a <see cref="JsonDocumentStream"/> over an in-memory buffer using simdjson's
     /// batching parser. The accepted document separators are selected by
     /// <see cref="NdjsonParserOptions.StreamFormat"/>.
