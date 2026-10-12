@@ -115,7 +115,75 @@ struct BridgeStream {
     simdjson::ondemand::document_stream::iterator current;
     simdjson::ondemand::document_stream::iterator end;
     bool started = false;
+
+    // A failed lookup abandons the document's iterator, and simdjson then keeps handing out
+    // documents that run with a null parser (a crash in debug builds, phantom documents in
+    // release). StreamNext restarts the stream past the failed document instead: `base` is
+    // where the restarted stream begins in `json_buf`.
+    simdjson::ondemand::parser* parser = nullptr;
+    size_t batch_size = 0;
+    simdjson::stream_format format = simdjson::stream_format::whitespace_delimited;
+    size_t base = 0;
+    bool finished = false;
 };
+
+// Where the document that starts at `start` ends, so a stream can resume after it. The line and
+// record-separator formats guarantee a delimiter, so those are exact. Otherwise the document is
+// skipped by balancing brackets outside strings, which is a best effort for malformed input.
+static size_t stream_resume_offset(const uint8_t* buf, size_t len, size_t start,
+                                   simdjson::stream_format format)
+{
+    if (start >= len) return len;
+    switch (format) {
+        case simdjson::stream_format::newline_delimited: {
+            const void* found = memchr(buf + start, '\n', len - start);
+            return found ? size_t(static_cast<const uint8_t*>(found) - buf) + 1 : len;
+        }
+        case simdjson::stream_format::json_sequence: {
+            const size_t from = start + (buf[start] == 0x1E ? 1 : 0);
+            if (from >= len) return len;
+            const void* found = memchr(buf + from, 0x1E, len - from);
+            return found ? size_t(static_cast<const uint8_t*>(found) - buf) : len;
+        }
+        default: break;
+    }
+
+    const bool comma = format == simdjson::stream_format::comma_delimited;
+    auto is_space = [](uint8_t c) { return c == ' ' || c == '\t' || c == '\n' || c == '\r'; };
+    size_t i = start;
+    while (i < len && (is_space(buf[i]) || (comma && buf[i] == ','))) i++;
+    if (i >= len) return len;
+
+    const uint8_t first = buf[i];
+    if (first == '{' || first == '[') {
+        int depth = 0;
+        bool in_string = false;
+        for (; i < len; i++) {
+            const uint8_t c = buf[i];
+            if (in_string) {
+                if (c == '\\') i++;
+                else if (c == '"') in_string = false;
+            } else if (c == '"') {
+                in_string = true;
+            } else if (c == '{' || c == '[') {
+                depth++;
+            } else if (c == '}' || c == ']') {
+                if (--depth == 0) { i++; break; }
+            }
+        }
+    } else if (first == '"') {
+        for (i++; i < len; i++) {
+            if (buf[i] == '\\') i++;
+            else if (buf[i] == '"') { i++; break; }
+        }
+    } else {
+        while (i < len && !is_space(buf[i]) && buf[i] != ',') i++;
+    }
+    if (i > len) i = len;
+    while (i < len && is_space(buf[i])) i++;
+    if (comma && i < len && buf[i] == ',') i++;
+    return i;
+}
 
 // Wraps an ondemand::value (ephemeral – must be consumed before document moves)
 struct BridgeValue {
@@ -326,6 +394,9 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ParseMany(
         }
         auto err = p->iterate_many(bs->json_buf, effective_batch, format).get(bs->stream);
         if (err) return translate_error(err);
+        bs->parser = p;
+        bs->batch_size = effective_batch;
+        bs->format = format;
 
         *out_stream = bs.release();
         return SIMDJSON_BRIDGE_SUCCESS;
@@ -344,12 +415,48 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_StreamNext(
     auto* bs = static_cast<BridgeStream*>(stream);
     try {
         // begin() runs stage 1 on the first batch, so it is deferred to the first call.
+        if (bs->finished) {
+            *out_done = 1;
+            *out_doc  = nullptr;
+            return SIMDJSON_BRIDGE_SUCCESS;
+        }
+
         if (!bs->started) {
             bs->current = bs->stream.begin();
             bs->end     = bs->stream.end();
             bs->started = true;
         } else {
-            ++bs->current;
+            bool abandoned = false;
+            {
+                auto previous = *bs->current;
+                simdjson::ondemand::document_reference prev_ref;
+                abandoned = !previous.get(prev_ref) && prev_ref.current_depth() == 0;
+            }
+            if (abandoned) {
+                const uint8_t* data = reinterpret_cast<const uint8_t*>(bs->json_buf.data());
+                const size_t total = bs->json_buf.size();
+                const size_t resume = stream_resume_offset(
+                    data, total, bs->base + bs->current.current_index(), bs->format);
+                // Destroy the old stream before the parser is used for a new one.
+                bs->stream = simdjson::ondemand::document_stream();
+                if (resume >= total) {
+                    bs->finished = true;
+                    *out_done = 1;
+                    *out_doc  = nullptr;
+                    return SIMDJSON_BRIDGE_SUCCESS;
+                }
+                auto restart = bs->parser->iterate_many(
+                    data + resume, total - resume, bs->batch_size, bs->format).get(bs->stream);
+                if (restart) {
+                    bs->finished = true;
+                    return translate_error(restart);
+                }
+                bs->base    = resume;
+                bs->current = bs->stream.begin();
+                bs->end     = bs->stream.end();
+            } else {
+                ++bs->current;
+            }
         }
 
         if (!(bs->current != bs->end)) {
@@ -388,7 +495,7 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_StreamCurrentIndex(
     CHECK_NULL(out_index);
     auto* bs = static_cast<BridgeStream*>(stream);
     if (!bs->started) return SIMDJSON_BRIDGE_ERR_ITERATION_ERROR;
-    *out_index = bs->current.current_index();
+    *out_index = bs->base + bs->current.current_index();
     return SIMDJSON_BRIDGE_SUCCESS;
 }
 
@@ -422,7 +529,7 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_StreamSizeInBytes(
     CHECK_NULL(stream);
     CHECK_NULL(out_size);
     auto* bs = static_cast<BridgeStream*>(stream);
-    *out_size = bs->stream.size_in_bytes();
+    *out_size = bs->base + bs->stream.size_in_bytes();
     return SIMDJSON_BRIDGE_SUCCESS;
 }
 

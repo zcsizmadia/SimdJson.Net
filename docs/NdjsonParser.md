@@ -97,6 +97,7 @@ public sealed class NdjsonParserOptions
     public int  BatchSize              { get; init; } // default: 0 = simdjson default (1 MB)
     public JsonStreamFormat StreamFormat { get; init; } // default: WhitespaceDelimited
     public bool AllowCommaSeparated    { get; init; } // legacy alias for CommaDelimited
+    public bool AllowNanInfinity       { get; init; } // default: false; see Numbers.md
 }
 ```
 
@@ -164,7 +165,17 @@ Use `JsonStreamFormat.NewlineDelimited` only when each document occupies one lin
 
 simdjson On-Demand reports most malformed input lazily, when a field is read rather than when the document is produced. A bad document does not end the stream, so iteration can continue past it, which is how `SkipMalformedLines` is implemented for this family.
 
-One caveat: a single malformed line can break into more than one unparseable document, so do not assume a one-to-one mapping between bad lines and errors.
+When a document fails while it is being read, simdjson leaves its iterator unusable and would carry on with the rest of the malformed text as if it were new documents. The native bridge detects this and restarts the stream just past the failed document, so one bad document produces one error.
+
+How the end of the failed document is found depends on `StreamFormat`:
+
+| Format | Resumes at |
+|--------|-----------|
+| `NewlineDelimited` | The next line. Exact, because the format promises one document per line |
+| `JsonTextSequence` | The next record separator. Exact |
+| `WhitespaceDelimited`, `CommaDelimited` | The point where the failed document's brackets balance, ignoring brackets inside strings. Best effort: a document with unbalanced brackets can swallow the documents after it, so prefer `NewlineDelimited` for input that may be malformed |
+
+`CurrentIndex` keeps reporting offsets into the original input after a restart.
 
 ## ParseAsync
 
