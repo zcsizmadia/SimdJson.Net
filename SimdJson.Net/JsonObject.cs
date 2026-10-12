@@ -256,7 +256,7 @@ public sealed class JsonObject : IDisposable, IEnumerable<JsonProperty>
         int maxBytes = Encoding.UTF8.GetMaxByteCount(path.Length);
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(path, buf);
-        var context = new JsonValue.WildcardContext(callback);
+        var context = new JsonValue.WildcardContext(callback, _owner);
         var gcHandle = System.Runtime.InteropServices.GCHandle.Alloc(context);
         try
         {

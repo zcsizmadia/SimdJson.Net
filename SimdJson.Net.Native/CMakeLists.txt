@@ -47,6 +47,9 @@ set(BUILD_SHARED_LIBS         OFF CACHE BOOL "" FORCE)  # make simdjson build st
 set(SIMDJSON_DEVELOPER_MODE   OFF CACHE BOOL "" FORCE)
 # Enable the experimental incomplete-JSON parsing API used by SimdJsonNative_ParseAllowIncompleteJson.
 add_compile_definitions(SIMDJSON_EXPERIMENTAL_ALLOW_INCOMPLETE_JSON)
+# Compile in NaN / Infinity parsing. It only changes tokens that start without a digit, which are
+# otherwise errors; the managed layer rejects them unless SimdJsonParser.AllowNanInfinity is set.
+set(SIMDJSON_ENABLE_NAN_INF ON CACHE BOOL "" FORCE)
 
 FetchContent_MakeAvailable(simdjson)
 

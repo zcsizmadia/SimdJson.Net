@@ -18,11 +18,14 @@ public sealed class JsonDocument : IDisposable
     private readonly bool _pinned;
     private bool _disposed;
 
-    internal JsonDocument(nint handle, SimdJsonParser? parser)
+    internal JsonDocument(nint handle, SimdJsonParser? parser, bool allowNanInfinity = false)
     {
         Handle = handle;
         _parser = parser;
+        AllowNanInfinity = parser?.AllowNanInfinity ?? allowNanInfinity;
     }
+
+    internal bool AllowNanInfinity { get; }
 
     /// <summary>
     /// Creates a document that borrows a caller-owned buffer. The pin is released on dispose;
@@ -267,6 +270,7 @@ public sealed class JsonDocument : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         SimdJsonException.ThrowIfError(NativeMethods.DocumentGetDouble(Handle, out double v));
+        if (!AllowNanInfinity && !double.IsFinite(v)) SimdJsonException.Throw(-2);
         return v;
     }
 
@@ -275,6 +279,7 @@ public sealed class JsonDocument : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         SimdJsonException.ThrowIfError(NativeMethods.DocumentGetFloat(Handle, out float v));
+        if (!AllowNanInfinity && !float.IsFinite(v)) SimdJsonException.Throw(-2);
         return v;
     }
 
@@ -370,6 +375,7 @@ public sealed class JsonDocument : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         SimdJsonException.ThrowIfError(NativeMethods.DocumentGetDoubleInString(Handle, out double v));
+        if (!AllowNanInfinity && !double.IsFinite(v)) SimdJsonException.Throw(-2);
         return v;
     }
 
@@ -456,6 +462,7 @@ public sealed class JsonDocument : IDisposable
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
         SimdJsonException.ThrowIfError(NativeMethods.DocumentGetNumber(Handle, out var n));
+        if (!AllowNanInfinity && (JsonNumberType)n.Type == JsonNumberType.FloatingPoint && !double.IsFinite(n.FloatingPoint)) SimdJsonException.Throw(-6);
         return new JsonNumber((JsonNumberType)n.Type, n.FloatingPoint, n.SignedInteger, n.UnsignedInteger);
     }
 
@@ -565,7 +572,7 @@ public sealed class JsonDocument : IDisposable
         int maxBytes = Encoding.UTF8.GetMaxByteCount(path.Length);
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(path, buf);
-        var context = new JsonValue.WildcardContext(callback);
+        var context = new JsonValue.WildcardContext(callback, this);
         var gcHandle = GCHandle.Alloc(context);
         try
         {

@@ -39,6 +39,7 @@ All `Parse` methods return a `JsonDocument` that **must be disposed**.
 | `Capacity` | Current internal buffer size in bytes; `0` before the first parse |
 | `MaxCapacity` *(get/set)* | Maximum allowed document size in bytes |
 | `MaxDepth` | Maximum JSON nesting depth the parser supports; set it with `Allocate` |
+| `AllowNanInfinity` *(get/set)* | Accept `NaN`, `Infinity` and `-Infinity` as numbers; default `false`. See [Numbers](Numbers.md#nan-and-infinity) |
 | `Allocate(nuint capacity, nuint maxDepth = 1024)` | Pre-allocates buffers for a document size and nesting depth |
 
 ### `ParseInPlace`
@@ -83,7 +84,7 @@ parser.Allocate(capacity: 4 * 1024 * 1024, maxDepth: 64);
 
 | Member | Description |
 |--------|-------------|
-| `GetVersion()` | Returns the simdjson version string (e.g. `"4.6.11"`) |
+| `GetVersion()` | Returns the simdjson version string (e.g. `"5.0.4"`) |
 | `ActiveImplementation` | Name of the SIMD kernel selected for this machine |
 | `Minify(string)` | Remove all insignificant whitespace; returns a `string` |
 | `MinifyUtf8(ReadOnlySpan<byte>)` | Minify UTF-8 JSON bytes; returns `byte[]` |
@@ -117,7 +118,7 @@ using var doc3 = await parser.ParseAsync(file, cancellationToken);
 // Utilities
 string mini = SimdJsonParser.Minify("""{ "a" : 1 , "b" : 2 }"""); // {"a":1,"b":2}
 bool ok      = SimdJsonParser.ValidateUtf8(someBytes);
-string ver   = SimdJsonParser.GetVersion();  // "4.6.11"
+string ver   = SimdJsonParser.GetVersion();  // "5.0.4"
 ```
 
 ---

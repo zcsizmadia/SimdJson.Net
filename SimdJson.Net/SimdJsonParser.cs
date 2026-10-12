@@ -45,7 +45,7 @@ public sealed class SimdJsonParser : IDisposable
     public static SimdJsonParser Shared => _shared ??= new SimdJsonParser();
 
     /// <summary>
-    /// Returns the simdjson library version string (e.g. <c>"4.6.11"</c>).
+    /// Returns the simdjson library version string (e.g. <c>"5.0.4"</c>).
     /// </summary>
     public static unsafe string GetVersion()
     {
@@ -114,6 +114,33 @@ public sealed class SimdJsonParser : IDisposable
             throw new InvalidOperationException("Failed to create native SimdJson parser.");
         }
     }
+
+    /// <summary>
+    /// When <see langword="true"/>, documents parsed after this is set accept the non-standard tokens
+    /// <c>NaN</c>, <c>Infinity</c>, <c>-Infinity</c> and the short form <c>inf</c> (matched
+    /// case-insensitively) as numbers. The default is <see langword="false"/>: such tokens are rejected
+    /// like any other malformed number.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// Applies to <see cref="JsonValue.GetDouble"/>, <see cref="JsonValue.GetFloat"/>,
+    /// <see cref="JsonValue.GetNumber"/>, <see cref="JsonValue.GetDoubleInString"/> and the matching
+    /// <see cref="JsonDocument"/> members. The flag is captured when a document is created, so changing it
+    /// does not affect documents that already exist.
+    /// </para>
+    /// <para>
+    /// simdjson recognises these tokens only when a number is read. <see cref="JsonValue.ValueKind"/> reports
+    /// <see cref="JsonValueKind.Unknown"/> for bare <c>NaN</c> and <c>Infinity</c> (and <see cref="JsonValueKind.Null"/>
+    /// for <c>nan</c>), and <see cref="JsonValue.GetNumberType"/> throws for them, so read such values with
+    /// <see cref="JsonValue.GetDouble"/> or <see cref="JsonValue.TryGetDouble"/> directly. A leading <c>+</c> is not
+    /// accepted. Applications that need to emit these values must write them themselves.
+    /// </para>
+    /// <para>
+    /// <see cref="Shared"/> is one instance per thread, so setting this on it affects that thread only.
+    /// Prefer a dedicated parser instance.
+    /// </para>
+    /// </remarks>
+    public bool AllowNanInfinity { get; set; }
 
     /// <summary>
     /// Returns the current internal buffer capacity in bytes.

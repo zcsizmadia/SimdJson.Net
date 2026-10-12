@@ -229,7 +229,7 @@ public sealed class JsonArray : IDisposable, IEnumerable<JsonValue>
         int maxBytes = System.Text.Encoding.UTF8.GetMaxByteCount(path.Length);
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = System.Text.Encoding.UTF8.GetBytes(path, buf);
-        var context = new JsonValue.WildcardContext(callback);
+        var context = new JsonValue.WildcardContext(callback, _owner);
         var gcHandle = GCHandle.Alloc(context);
         try
         {
