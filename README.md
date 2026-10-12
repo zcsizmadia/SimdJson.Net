@@ -4,10 +4,10 @@
 [![NuGet](https://img.shields.io/nuget/v/SimdJson.Net.svg?logo=nuget&label=NuGet)](https://www.nuget.org/packages/SimdJson.Net)
 [![Downloads](https://img.shields.io/nuget/dt/SimdJson.Net.svg?logo=nuget&label=Downloads)](https://www.nuget.org/packages/SimdJson.Net)
 [![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
-[![simdjson](https://img.shields.io/badge/simdjson-5.0.1-0A7BBB)](https://github.com/simdjson/simdjson/releases/tag/v5.0.1)
+[![simdjson](https://img.shields.io/badge/simdjson-5.0.4-0A7BBB)](https://github.com/simdjson/simdjson/releases/tag/v5.0.4)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-A high-performance .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v5.0.1, exposing the On-Demand API via a thin C ABI bridge.
+A high-performance .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v5.0.4, exposing the On-Demand API via a thin C ABI bridge.
 
 - **`SimdJson.Net`** — idiomatic C# API: `SimdJsonParser`, `JsonDocument`, `JsonValue`, `JsonArray`, `JsonObject`, plus `NdjsonParser` and `JsonDocumentStream` for in-memory document streams (whitespace, newline, RFC 7464, or comma delimited)
 
@@ -61,7 +61,7 @@ using var city = doc.AtPointer("/address/city");
 using var val = doc["address"]["city"];
 
 // Get simdjson version
-Console.WriteLine(SimdJsonParser.GetVersion()); // e.g. "4.6.11"
+Console.WriteLine(SimdJsonParser.GetVersion()); // e.g. "5.0.4"
 ```
 
 ## Installation
