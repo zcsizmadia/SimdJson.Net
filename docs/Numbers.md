@@ -88,6 +88,37 @@ Console.WriteLine(v.IsNegative()); // true for -3.14
 Console.WriteLine(v.IsInteger());  // false for 3.14, true for 3
 ```
 
+
+## NaN and Infinity
+
+Strict JSON has no way to write `NaN` or `Infinity`, but many producers emit them anyway. They are rejected by default. Set `AllowNanInfinity` on the parser to accept them:
+
+```csharp
+using var parser = new SimdJsonParser { AllowNanInfinity = true };
+using var doc = parser.Parse("""{"a":NaN,"b":-Infinity,"c":"Infinity"}""");
+
+using var a = doc.GetField("a");
+Console.WriteLine(double.IsNaN(a.GetDouble()));                      // true
+using var b = doc.GetField("b");
+Console.WriteLine(double.IsNegativeInfinity(b.GetDouble()));         // true
+using var c = doc.GetField("c");
+Console.WriteLine(double.IsPositiveInfinity(c.GetDoubleInString())); // true
+```
+
+| Detail | Behaviour |
+|--------|-----------|
+| Accepted tokens | `NaN`, `Infinity`, `-Infinity`, and the short forms `nan`, `inf`, `-inf`. Matching is case-insensitive |
+| Rejected tokens | `+Infinity`, and anything that merely starts like one (`NaNx`, `Infinit`) |
+| Members affected | `GetDouble`, `GetFloat`, `GetNumber`, `GetDoubleInString` (and their `Try` forms) on `JsonValue` and `JsonDocument` |
+| Default | Off. The same tokens throw `SimdJsonException` (`-2`, or `-6` from `GetNumber`), exactly as before |
+| Out-of-range numbers | `1e999` still throws; it never becomes infinity |
+| Scope | Captured when a document is created. Changing the flag later does not change existing documents |
+| Streams | `NdjsonParserOptions.AllowNanInfinity` applies it to every stream and NDJSON parsing method |
+
+simdjson recognises these tokens only when a number is read. `ValueKind` reports `Unknown` for a bare `NaN` or `Infinity` (and `Null` for `nan`), and `GetNumberType` throws for them. Read such values with `GetDouble` or `TryGetDouble` directly instead of checking the kind first.
+
+`SimdJsonParser.Shared` is one instance per thread, so setting the flag on it affects only the calling thread. Use a dedicated parser instance instead.
+
 ---
 
 ← [API Reference](API.md)

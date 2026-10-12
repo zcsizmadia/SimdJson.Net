@@ -18,6 +18,8 @@ public sealed class JsonValue : IDisposable
     private bool _disposed;
     private readonly bool _isBorrowed;
 
+    private bool NanInfinityAllowed => _owner is { AllowNanInfinity: true };
+
     internal JsonValue(nint handle, JsonDocument? owner, bool isBorrowed = false)
     {
         Handle = handle;
@@ -106,6 +108,7 @@ public sealed class JsonValue : IDisposable
     {
         ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetDouble(Handle, out double v));
+        if (!NanInfinityAllowed && !double.IsFinite(v)) SimdJsonException.Throw(-2);
         return v;
     }
 
@@ -180,6 +183,7 @@ public sealed class JsonValue : IDisposable
     {
         ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetFloat(Handle, out float v));
+        if (!NanInfinityAllowed && !float.IsFinite(v)) SimdJsonException.Throw(-2);
         return v;
     }
 
@@ -438,6 +442,7 @@ public sealed class JsonValue : IDisposable
     {
         ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetDoubleInString(Handle, out double v));
+        if (!NanInfinityAllowed && !double.IsFinite(v)) SimdJsonException.Throw(-2);
         return v;
     }
 
@@ -637,6 +642,7 @@ public sealed class JsonValue : IDisposable
     {
         ThrowIfDisposed();
         SimdJsonException.ThrowIfError(NativeMethods.ValueGetNumber(Handle, out var n));
+        if (!NanInfinityAllowed && (JsonNumberType)n.Type == JsonNumberType.FloatingPoint && !double.IsFinite(n.FloatingPoint)) SimdJsonException.Throw(-6);
         return new JsonNumber(
             (JsonNumberType)n.Type,
             n.FloatingPoint,
@@ -741,7 +747,7 @@ public sealed class JsonValue : IDisposable
         int maxBytes = Encoding.UTF8.GetMaxByteCount(path.Length);
         Span<byte> buf = maxBytes <= 256 ? stackalloc byte[maxBytes] : new byte[maxBytes];
         int len = Encoding.UTF8.GetBytes(path, buf);
-        var context = new WildcardContext(callback);
+        var context = new WildcardContext(callback, _owner);
         var gcHandle = GCHandle.Alloc(context);
         try
         {
@@ -765,10 +771,12 @@ public sealed class JsonValue : IDisposable
     /// frame below — the runtime would terminate the process — so it is stored here and
     /// rethrown by the caller once the native iteration has returned.
     /// </summary>
-    internal sealed class WildcardContext(Action<JsonValue> callback)
+    internal sealed class WildcardContext(Action<JsonValue> callback, JsonDocument? owner)
     {
         private readonly Action<JsonValue> _callback = callback;
         private ExceptionDispatchInfo? _fault;
+
+        internal JsonDocument? Owner { get; } = owner;
 
         internal void Invoke(JsonValue value)
         {
@@ -797,7 +805,7 @@ public sealed class JsonValue : IDisposable
     private static void WildcardTrampoline(nint valueHandle, nint context)
     {
         var ctx = (WildcardContext)GCHandle.FromIntPtr(context).Target!;
-        var tmp = new JsonValue(valueHandle, null, isBorrowed: true);
+        var tmp = new JsonValue(valueHandle, ctx.Owner, isBorrowed: true);
         ctx.Invoke(tmp);
         // The native BridgeValue lives on the C++ stack for the duration of this call only.
         // Poison the wrapper so a callback that stored it gets ObjectDisposedException

@@ -133,6 +133,81 @@ public class DocumentStreamTests
         await Assert.That(ids).IsEquivalentTo(new long[] { 1, 3 });
     }
 
+    // A failed lookup abandons simdjson's document iterator, after which the stream keeps handing
+    // out documents that run with a null parser. These cover the bridge restarting past the bad one.
+
+    [Test]
+    [Arguments(JsonStreamFormat.WhitespaceDelimited)]
+    [Arguments(JsonStreamFormat.NewlineDelimited)]
+    public async Task Parse_SkipsMalformedDocument_InEveryFormat(JsonStreamFormat format)
+    {
+        var ids = NdjsonParser.Parse(
+            Utf8("{\"id\":1}\n{not json}\n{\"id\":3}\n"), SelectId,
+            new NdjsonParserOptions { StreamFormat = format });
+        await Assert.That(ids).IsEquivalentTo(new long[] { 1, 3 });
+    }
+
+    [Test]
+    [Arguments(JsonStreamFormat.WhitespaceDelimited)]
+    [Arguments(JsonStreamFormat.NewlineDelimited)]
+    public async Task Parse_SkipsConsecutiveAndLeadingMalformedDocuments(JsonStreamFormat format)
+    {
+        var options = new NdjsonParserOptions { StreamFormat = format };
+        var ids = NdjsonParser.Parse(
+            Utf8("{bad}\n{\"id\":1}\n{x}\n{y}\n{\"id\":4}\n"), SelectId, options);
+        await Assert.That(ids).IsEquivalentTo(new long[] { 1, 4 });
+    }
+
+    [Test]
+    [Arguments(JsonStreamFormat.WhitespaceDelimited)]
+    [Arguments(JsonStreamFormat.NewlineDelimited)]
+    public async Task Parse_SkipsMalformedDocuments_AcrossBatches(JsonStreamFormat format)
+    {
+        var input = new StringBuilder();
+        var expected = new List<long>();
+        for (int i = 0; i < 300; i++)
+        {
+            if (i % 7 == 3)
+            {
+                input.Append("{oops ").Append(i).Append("}\n");
+            }
+            else
+            {
+                input.Append("{\"id\":").Append(i).Append(",\"pad\":\"xxxxxxxxxxxxxxxx\"}\n");
+                expected.Add(i);
+            }
+        }
+
+        var ids = NdjsonParser.Parse(
+            Utf8(input.ToString()), SelectId,
+            new NdjsonParserOptions { StreamFormat = format, BatchSize = 256 });
+        await Assert.That(ids).IsEquivalentTo(expected);
+    }
+
+    [Test]
+    [Arguments(JsonStreamFormat.WhitespaceDelimited)]
+    [Arguments(JsonStreamFormat.NewlineDelimited)]
+    public async Task CurrentIndex_AfterSkippingMalformedDocument_PointsAtTheNextDocument(JsonStreamFormat format)
+    {
+        // {"id":1}\n is 9 bytes and {not json}\n is 11, so the third document starts at 20.
+        using var stream = NdjsonParser.OpenStream(
+            Utf8("{\"id\":1}\n{not json}\n{\"id\":3}\n"),
+            new NdjsonParserOptions { StreamFormat = format });
+
+        await Assert.That(stream.MoveNext()).IsTrue();
+        await Assert.That(SelectId(stream.Current!)).IsEqualTo(1L);
+
+        await Assert.That(stream.MoveNext()).IsTrue();
+        await Assert.That(() => SelectId(stream.Current!)).Throws<SimdJsonException>();
+
+        await Assert.That(stream.MoveNext()).IsTrue();
+        await Assert.That(stream.CurrentIndex).IsEqualTo((nuint)20);
+        await Assert.That(SelectId(stream.Current!)).IsEqualTo(3L);
+
+        await Assert.That(stream.MoveNext()).IsFalse();
+        await Assert.That(stream.MoveNext()).IsFalse();
+    }
+
     [Test]
     public async Task Parse_MalformedDocument_ThrowsWhenNotSkipping()
     {

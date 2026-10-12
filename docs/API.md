@@ -85,7 +85,7 @@ JsonNumber n = val.GetNumber();
 ### Utilities
 
 ```csharp
-SimdJsonParser.GetVersion();           // "4.6.11"
+SimdJsonParser.GetVersion();           // "5.0.4"
 SimdJsonParser.ActiveImplementation;   // "haswell" — SIMD kernel in use
 SimdJsonParser.Minify(json);
 SimdJsonParser.ValidateUtf8(bytes);

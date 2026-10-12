@@ -77,6 +77,12 @@ public sealed class NdjsonParserOptions
     public JsonStreamFormat StreamFormat { get; init; } = JsonStreamFormat.WhitespaceDelimited;
 
     /// <summary>
+    /// Accept <c>NaN</c>, <c>Infinity</c> and <c>-Infinity</c> as numbers in the parsed documents.
+    /// See <see cref="SimdJsonParser.AllowNanInfinity"/>. Defaults to <see langword="false"/>.
+    /// </summary>
+    public bool AllowNanInfinity { get; init; }
+
+    /// <summary>
     /// Legacy alias for <see cref="StreamFormat"/> = <see cref="JsonStreamFormat.CommaDelimited"/>.
     /// Prefer <see cref="StreamFormat"/> for new code. Used only by the in-memory batching overloads.
     /// </summary>
@@ -204,7 +210,7 @@ public static class NdjsonParser
 
         // The stream owns a padded copy of the input, so the caller's span need not outlive
         // this call. The parser handle is owned by the stream for its lifetime.
-        var parser = new SimdJsonParser();
+        var parser = new SimdJsonParser { AllowNanInfinity = options.AllowNanInfinity };
         try
         {
             nint streamHandle;
@@ -307,7 +313,7 @@ public static class NdjsonParser
         ArgumentNullException.ThrowIfNull(selector);
         options ??= NdjsonParserOptions.Default;
 
-        var parser = new SimdJsonParser();
+        var parser = new SimdJsonParser { AllowNanInfinity = options.AllowNanInfinity };
         try
         {
             // yield return inside try-finally (no catch) is allowed by the C# spec.
@@ -409,7 +415,7 @@ public static class NdjsonParser
         {
             workerTasks[i] = Task.Run(async () =>
             {
-                var parser = new SimdJsonParser();
+                var parser = new SimdJsonParser { AllowNanInfinity = options.AllowNanInfinity };
                 try
                 {
                     await foreach (var (buf, len) in lineChannel.Reader.ReadAllAsync(cts.Token).ConfigureAwait(false))
@@ -516,7 +522,7 @@ public static class NdjsonParser
         {
             workerTasks[i] = Task.Run(async () =>
             {
-                var parser = new SimdJsonParser();
+                var parser = new SimdJsonParser { AllowNanInfinity = options.AllowNanInfinity };
                 try
                 {
                     await foreach (var (buf, len) in lineChannel.Reader.ReadAllAsync(cts.Token).ConfigureAwait(false))
