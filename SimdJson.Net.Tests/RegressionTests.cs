@@ -161,3 +161,32 @@ public class ArrayAtIndexTests
         await Assert.That(b.GetInt64()).IsEqualTo(8L);
     }
 }
+
+// ─── simdjson 5.x upstream fixes ─────────────────────────────────────────────
+
+public class UpstreamFixTests
+{
+    [Test]
+    [Arguments("1e00000000000000000001", 10.0)]
+    [Arguments("1e-00000000000000000001", 0.1)]
+    [Arguments("0e99999999999999999999", 0.0)]
+    public async Task GetDouble_ExponentWiderThan19Digits_Parses(string json, double expected)
+    {
+        // simdjson 5.1.0 (simdjson#2991) accepts exponents written with more than 19 digits.
+        using var doc = SimdJsonParser.Shared.Parse($"{{\"n\":{json}}}");
+        using var val = doc.GetField("n");
+        await Assert.That(val.GetDouble()).IsEqualTo(expected);
+    }
+
+    [Test]
+    [Arguments("falsx")]
+    [Arguments("fals ")]
+    public async Task GetBool_RootWithInvalidFifthChar_Throws(string json)
+    {
+        // Before simdjson 5.0.6 (simdjson#2940) the root getter read these as false.
+        using var parser = new SimdJsonParser();
+        using var doc = parser.Parse(json);
+        var ex = await Assert.That(() => doc.GetBool()).Throws<SimdJsonException>();
+        await Assert.That(ex!.ErrorCode).IsEqualTo(-2);
+    }
+}

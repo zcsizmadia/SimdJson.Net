@@ -2,7 +2,7 @@
 
 ## What this project is
 
-A .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v5.0.4 exposing the **On-Demand** API. Architecture:
+A .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v5.1.1 exposing the **On-Demand** API. Architecture:
 
 ```
 C++ (simdjson On-Demand) → C ABI bridge (SimdJsonNative.dll) → C# P/Invoke → public API
@@ -61,7 +61,7 @@ Run tests: `dotnet test SimdJson.Net.Tests`
 
 ## Target frameworks
 
-`net8.0`, `net9.0`, `net10.0` — all three must be kept in sync.
+Libraries: `net8.0`, `net10.0` (`DefaultTargetFrameworks`). Tests and `NupkgValidator`: `net8.0`, `net10.0`, `net11.0` (`TestTargetFrameworks`), all run in CI.
 
 ## Experimental incomplete-JSON parsing
 
