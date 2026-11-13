@@ -74,8 +74,8 @@ jobs:
         with:
           dotnet-version: |
             8.0.x
-            9.0.x
             10.0.x
+            11.0.x
 
       - name: Check SimdJson version
         shell: bash
@@ -185,7 +185,9 @@ jobs:
         uses: actions/setup-dotnet@v6
         with:
           dotnet-version: |
+            8.0.x
             10.0.x
+            11.0.x
 
       - name: Download NuGet package artifact
         uses: actions/download-artifact@v8
@@ -205,4 +207,9 @@ jobs:
           cd NupkgValidator
           dotnet restore --source ../nupkgs
           dotnet build --no-restore
-          dotnet run --no-build
+          TFMS="$(dotnet msbuild -getProperty:TargetFrameworks -nologo -v:q | tr -d '\r' | xargs)"
+          for tfm in ${TFMS//;/ }; do
+            echo "::group::NupkgValidator ($tfm)"
+            dotnet run --no-build -f "$tfm"
+            echo "::endgroup::"
+          done

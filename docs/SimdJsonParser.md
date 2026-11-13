@@ -84,7 +84,7 @@ parser.Allocate(capacity: 4 * 1024 * 1024, maxDepth: 64);
 
 | Member | Description |
 |--------|-------------|
-| `GetVersion()` | Returns the simdjson version string (e.g. `"5.0.4"`) |
+| `GetVersion()` | Returns the simdjson version string (e.g. `"5.1.1"`) |
 | `ActiveImplementation` | Name of the SIMD kernel selected for this machine |
 | `Minify(string)` | Remove all insignificant whitespace; returns a `string` |
 | `MinifyUtf8(ReadOnlySpan<byte>)` | Minify UTF-8 JSON bytes; returns `byte[]` |
@@ -118,7 +118,7 @@ using var doc3 = await parser.ParseAsync(file, cancellationToken);
 // Utilities
 string mini = SimdJsonParser.Minify("""{ "a" : 1 , "b" : 2 }"""); // {"a":1,"b":2}
 bool ok      = SimdJsonParser.ValidateUtf8(someBytes);
-string ver   = SimdJsonParser.GetVersion();  // "5.0.4"
+string ver   = SimdJsonParser.GetVersion();  // "5.1.1"
 ```
 
 ---

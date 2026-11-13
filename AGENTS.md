@@ -6,7 +6,7 @@ Guidance for AI agents (Codex, Claude, Copilot, etc.) working in this repository
 
 ## Project overview
 
-**SimdJson.Net** is a .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v5.0.4 that exposes the On-Demand streaming JSON parser.
+**SimdJson.Net** is a .NET wrapper for [simdjson](https://github.com/simdjson/simdjson) v5.1.1 that exposes the On-Demand streaming JSON parser.
 
 ```
 simdjson (C++, FetchContent) ──► SimdJsonNative.dll  (C ABI bridge, CMake)
@@ -31,7 +31,7 @@ simdjson (C++, FetchContent) ──► SimdJsonNative.dll  (C ABI bridge, CMake)
 | `SimdJson.Net.Benchmark/` | BenchmarkDotNet suites: parse, field access, full traversal, NDJSON |
 | `NupkgValidator/` | Consumes the freshly built package and loads the native library on each RID |
 | `.github/workflows/release.yml` | Publishes to NuGet.org and GitHub Packages when a release is published |
-| `SimdJson.Net.Tests/*.cs` | TUnit tests, one file per topic (522 per target framework, 1,566 across net8/net9/net10) |
+| `SimdJson.Net.Tests/*.cs` | TUnit tests, one file per topic (527 per target framework, 1,581 across net8/net10/net11) |
 | `Samples/0N-Name/Program.cs` | 13 standalone demo apps |
 | `docs/` | Per-type API reference; `docs/API.md` is the index |
 | `.github/workflows/build.yml` | CI: builds native libs for 8 RIDs, then runs .NET tests |
@@ -93,7 +93,7 @@ struct BridgeObject   { ondemand::object object; };
 
 ### Stream recovery
 
-When a lookup fails, simdjson's `json_iterator::abandon()` sets the document's depth to 0 **and its parser pointer to null**. `document_stream` never restores that pointer, so continuing the same stream yields phantom documents and then a null-parser access violation (reproducible with simdjson alone, in Debug and in Release for `newline_delimited`). `SimdJsonNative_StreamNext` therefore checks `current_depth() == 0` on the previous document before advancing. If it is abandoned, it destroys the stream and restarts `iterate_many` at the next document boundary (`stream_resume_offset`), and `BridgeStream::base` is added back to `CurrentIndex` and the size so offsets stay relative to the original input. Do not try to repair the iterator in place: `document::rewind()` dereferences the same null pointer.
+When a lookup fails, simdjson's `json_iterator::abandon()` sets the document's depth to 0 **and its parser pointer to null**. `document_stream` never restores that pointer. Before simdjson 5.0.6 continuing the same stream yielded phantom documents and then a null-parser access violation; since 5.0.6 (simdjson#2948) the stream instead stops with an error at that document, which would still end the caller's iteration. `SimdJsonNative_StreamNext` therefore checks `current_depth() == 0` on the previous document before advancing. If it is abandoned, it destroys the stream and restarts `iterate_many` at the next document boundary (`stream_resume_offset`), and `BridgeStream::base` is added back to `CurrentIndex` and the size so offsets stay relative to the original input. Do not try to repair the iterator in place: `document::rewind()` dereferences the same null pointer.
 
 Two consequences of the `BridgeDocument` shape worth knowing:
 
@@ -301,7 +301,7 @@ releases changed behaviour this wrapper depends on, and the pull request should 
 `.github/workflows/build.yml`:
 1. **Parallel native builds** — 8 RIDs (win-x64, win-arm64, linux-x64, linux-arm64, linux-musl-x64, linux-musl-arm64, osx-x64, osx-arm64). Each step: `cmake -S … -DCMAKE_INSTALL_PREFIX=… && cmake --build … && cmake --install …`
 2. **Artifact upload** — each native build uploads its `runtimes/<rid>/native/` folder.
-3. **Test job** — downloads all 8 artifacts, runs `dotnet test` on net8/net9/net10 for each RID.
+3. **Test job** — downloads all 8 artifacts, runs `dotnet test` on net8/net10/net11 for each RID. `validate-nupkg` runs `NupkgValidator` on the same three.
 
 When modifying the CMake build, update both `CMakeLists.txt` and `CMakePresets.json`. The preset's `CMAKE_INSTALL_PREFIX` must match the expected runtimes path.
 
@@ -315,7 +315,7 @@ When modifying the CMake build, update both `CMakeLists.txt` and `CMakePresets.j
 - **`ThrowIfError`** immediately after every P/Invoke call.
 - **String passing to native**: `fixed (byte* p = MemoryMarshal.AsBytes(key.AsSpan()))` — keys are passed as UTF-8 byte pointers with a length. See existing `GetField` implementations.
 - **Key matching is against escaped bytes**: simdjson compares a lookup key with the raw bytes in the document, so `GetField("a\"b")` never matches `{"a\"b":1}`. Object iteration exposes both forms, `JsonProperty.Name` unescaped and `JsonProperty.EscapedName` as written; only the latter round-trips into a lookup.
-- **Target frameworks**: `net8.0;net9.0;net10.0` — all three must stay in sync.
+- **Target frameworks**: the libraries target `net8.0;net10.0` (`DefaultTargetFrameworks` in `Directory.Build.props`). The tests and `NupkgValidator` also run on `net11.0` (`TestTargetFrameworks`), so building them needs the .NET 11 SDK; `global.json` rolls forward to the newest installed major.
 - The experimental `ParseAllowIncompleteJson` path is guarded by `#ifdef SIMDJSON_EXPERIMENTAL_ALLOW_INCOMPLETE_JSON` in the C++ bridge; this define is set via `add_compile_definitions` in `CMakeLists.txt`.
 - **NaN / Infinity** are compiled in (`SIMDJSON_ENABLE_NAN_INF` is forced `ON` in `CMakeLists.txt`) but rejected by default. simdjson's flag is compile-time only, so the opt-in lives in the managed layer: `SimdJsonParser.AllowNanInfinity` is captured into `JsonDocument.AllowNanInfinity`, and the double/float/number getters throw the strict-mode error (`-2`, or `-6` from `GetNumber`) when a non-finite result comes back and the flag is off. A non-finite result can only come from the NaN path (`1e999` is a `-6` error, never infinity). Any new getter that can return a `double`/`float` must apply the same check; values created without an owner (`JsonValue` with a null `_owner`) are always strict.
 

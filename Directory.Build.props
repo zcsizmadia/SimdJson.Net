@@ -1,11 +1,12 @@
 <Project>
   <PropertyGroup>
-    <SimdJsonVersion>5.0.4</SimdJsonVersion>
+    <SimdJsonVersion>5.1.1</SimdJsonVersion>
     <Version>$(SimdJsonVersion).1</Version>
   </PropertyGroup>
 
   <PropertyGroup>
-    <DefaultTargetFrameworks>net8.0;net9.0;net10.0</DefaultTargetFrameworks>
+    <DefaultTargetFrameworks>net8.0;net10.0</DefaultTargetFrameworks>
+    <TestTargetFrameworks>net8.0;net10.0;net11.0</TestTargetFrameworks>
     <DefaultTargetFramework>net10.0</DefaultTargetFramework>
   </PropertyGroup>
 
