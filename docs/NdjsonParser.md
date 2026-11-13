@@ -98,6 +98,7 @@ public sealed class NdjsonParserOptions
     public JsonStreamFormat StreamFormat { get; init; } // default: WhitespaceDelimited
     public bool AllowCommaSeparated    { get; init; } // legacy alias for CommaDelimited
     public bool AllowNanInfinity       { get; init; } // default: false; see Numbers.md
+    public int  MaxDepth               { get; init; } // default: 1024
 }
 ```
 
@@ -113,6 +114,7 @@ public sealed class NdjsonParserOptions
 | `BatchSize` | Bytes indexed at a time by `Parse`/`OpenStream`. `0` selects simdjson's default of 1 MB. Must exceed the largest single document, or that document cannot be parsed. Ignored by the `Stream` overloads. |
 | `StreamFormat` | Separator mode for the in-memory `Parse`/`OpenStream` overloads: whitespace delimited by default, one-document-per-line fast path, RFC 7464 JSON text sequence, or comma-delimited documents. Ignored by the `Stream` overloads. |
 | `AllowCommaSeparated` | Compatibility alias for `StreamFormat = JsonStreamFormat.CommaDelimited`. Prefer `StreamFormat` in new code. |
+| `MaxDepth` | Maximum nesting depth of the parsed documents, applied to every overload; see [`SimdJsonParser.MaxDepth`](SimdJsonParser.md#allocate). Opening a container this deep throws `-12`. The `Stream` overloads treat that like any other parse error, so `SkipMalformedLines` skips the line. Must be positive. |
 
 ### JsonStreamFormat
 

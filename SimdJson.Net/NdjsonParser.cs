@@ -88,6 +88,40 @@ public sealed class NdjsonParserOptions
     /// </summary>
     public bool AllowCommaSeparated { get; init; } = false;
 
+    /// <summary>
+    /// Maximum nesting depth of the parsed documents. Defaults to 1024, simdjson's default.
+    /// See <see cref="SimdJsonParser.MaxDepth"/>.
+    /// </summary>
+    /// <remarks>
+    /// Opening an object or array at this depth or deeper throws <see cref="SimdJsonException"/>
+    /// with code <c>-12</c>. Applies to every <see cref="NdjsonParser"/> overload. When
+    /// <see cref="SkipMalformedLines"/> is set, the stream-based overloads skip such lines like any
+    /// other parse error.
+    /// </remarks>
+    public int MaxDepth { get; init; } = (int)JsonDocument.DefaultMaxDepth;
+
+    internal void ValidateMaxDepth() => ArgumentOutOfRangeException.ThrowIfNegativeOrZero(MaxDepth);
+
+    internal SimdJsonParser CreateParser()
+    {
+        ValidateMaxDepth();
+        var parser = new SimdJsonParser { AllowNanInfinity = AllowNanInfinity };
+        if ((nuint)MaxDepth != parser.MaxDepth)
+        {
+            try
+            {
+                parser.Allocate(0, (nuint)MaxDepth);
+            }
+            catch
+            {
+                parser.Dispose();
+                throw;
+            }
+        }
+
+        return parser;
+    }
+
     internal int GetNativeStreamFormat()
     {
         if (!Enum.IsDefined(StreamFormat))
@@ -210,7 +244,7 @@ public static class NdjsonParser
 
         // The stream owns a padded copy of the input, so the caller's span need not outlive
         // this call. The parser handle is owned by the stream for its lifetime.
-        var parser = new SimdJsonParser { AllowNanInfinity = options.AllowNanInfinity };
+        var parser = options.CreateParser();
         try
         {
             nint streamHandle;
@@ -313,7 +347,7 @@ public static class NdjsonParser
         ArgumentNullException.ThrowIfNull(selector);
         options ??= NdjsonParserOptions.Default;
 
-        var parser = new SimdJsonParser { AllowNanInfinity = options.AllowNanInfinity };
+        var parser = options.CreateParser();
         try
         {
             // yield return inside try-finally (no catch) is allowed by the C# spec.
@@ -356,6 +390,7 @@ public static class NdjsonParser
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(selector);
         options ??= NdjsonParserOptions.Default;
+        options.ValidateMaxDepth();
 
         int dop = Math.Max(1, options.MaxDegreeOfParallelism);
         int cap = options.ChannelCapacity > 0 ? options.ChannelCapacity : dop * 4;
@@ -415,7 +450,7 @@ public static class NdjsonParser
         {
             workerTasks[i] = Task.Run(async () =>
             {
-                var parser = new SimdJsonParser { AllowNanInfinity = options.AllowNanInfinity };
+                var parser = options.CreateParser();
                 try
                 {
                     await foreach (var (buf, len) in lineChannel.Reader.ReadAllAsync(cts.Token).ConfigureAwait(false))
@@ -477,6 +512,7 @@ public static class NdjsonParser
         ArgumentNullException.ThrowIfNull(stream);
         ArgumentNullException.ThrowIfNull(action);
         options ??= NdjsonParserOptions.Default;
+        options.ValidateMaxDepth();
 
         int dop = Math.Max(1, options.MaxDegreeOfParallelism);
         int cap = options.ChannelCapacity > 0 ? options.ChannelCapacity : dop * 4;
@@ -522,7 +558,7 @@ public static class NdjsonParser
         {
             workerTasks[i] = Task.Run(async () =>
             {
-                var parser = new SimdJsonParser { AllowNanInfinity = options.AllowNanInfinity };
+                var parser = options.CreateParser();
                 try
                 {
                     await foreach (var (buf, len) in lineChannel.Reader.ReadAllAsync(cts.Token).ConfigureAwait(false))

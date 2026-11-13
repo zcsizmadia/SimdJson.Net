@@ -19,6 +19,7 @@ public sealed class JsonValue : IDisposable
     private readonly bool _isBorrowed;
 
     private bool NanInfinityAllowed => _owner is { AllowNanInfinity: true };
+    private nuint MaxDepth => _owner?.MaxDepth ?? JsonDocument.DefaultMaxDepth;
 
     internal JsonValue(nint handle, JsonDocument? owner, bool isBorrowed = false)
     {
@@ -148,7 +149,7 @@ public sealed class JsonValue : IDisposable
     public JsonArray GetArray()
     {
         ThrowIfDisposed();
-        SimdJsonException.ThrowIfError(NativeMethods.ValueGetArray(Handle, out var h));
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetArray(Handle, MaxDepth, out var h));
         return new JsonArray(h, _owner!);
     }
 
@@ -156,7 +157,7 @@ public sealed class JsonValue : IDisposable
     public JsonObject GetObject()
     {
         ThrowIfDisposed();
-        SimdJsonException.ThrowIfError(NativeMethods.ValueGetObject(Handle, out var h));
+        SimdJsonException.ThrowIfError(NativeMethods.ValueGetObject(Handle, MaxDepth, out var h));
         return new JsonObject(h, _owner!);
     }
 

@@ -83,6 +83,13 @@ static std::string_view rtrim_json_whitespace(std::string_view sv) noexcept {
     return sv;
 }
 
+// simdjson checks max_depth while iterating only under SIMDJSON_DEVELOPMENT_CHECKS, so the bridge
+// applies the same rule before opening a container: one at depth >= max_depth is a DEPTH_ERROR.
+// The caller passes the parser's max_depth, which a value cannot reach.
+static bool exceeds_max_depth(int32_t depth, size_t max_depth) noexcept {
+    return depth > 0 && size_t(depth) >= max_depth;
+}
+
 // ─── Internal structs ────────────────────────────────────────────────────────
 
 // Owns the padded JSON buffer + the document produced from it.
@@ -557,11 +564,12 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetType(
 }
 
 extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetArray(
-    SimdJsonDocument doc, SimdJsonArray* out_array)
+    SimdJsonDocument doc, size_t max_depth, SimdJsonArray* out_array)
 {
     CHECK_NULL(doc);
     CHECK_NULL(out_array);
     auto* bd = static_cast<BridgeDocument*>(doc);
+    if (exceeds_max_depth(bd->doc->current_depth(), max_depth)) return SIMDJSON_BRIDGE_ERR_DEPTH;
     try {
         auto* ba = new BridgeArray();
         auto err = bd->doc->get_array().get(ba->array);
@@ -572,11 +580,12 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetArray(
 }
 
 extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetObject(
-    SimdJsonDocument doc, SimdJsonObject* out_object)
+    SimdJsonDocument doc, size_t max_depth, SimdJsonObject* out_object)
 {
     CHECK_NULL(doc);
     CHECK_NULL(out_object);
     auto* bd = static_cast<BridgeDocument*>(doc);
+    if (exceeds_max_depth(bd->doc->current_depth(), max_depth)) return SIMDJSON_BRIDGE_ERR_DEPTH;
     try {
         auto* bo = new BridgeObject();
         auto err = bd->doc->get_object().get(bo->object);
@@ -760,11 +769,12 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueIsNull(
 }
 
 extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetArray(
-    SimdJsonValue value, SimdJsonArray* out_array)
+    SimdJsonValue value, size_t max_depth, SimdJsonArray* out_array)
 {
     CHECK_NULL(value);
     CHECK_NULL(out_array);
     auto* bv = static_cast<BridgeValue*>(value);
+    if (exceeds_max_depth(bv->value.current_depth(), max_depth)) return SIMDJSON_BRIDGE_ERR_DEPTH;
     try {
         auto* ba = new BridgeArray();
         auto err = bv->value.get_array().get(ba->array);
@@ -775,11 +785,12 @@ extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetArray(
 }
 
 extern "C" SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetObject(
-    SimdJsonValue value, SimdJsonObject* out_object)
+    SimdJsonValue value, size_t max_depth, SimdJsonObject* out_object)
 {
     CHECK_NULL(value);
     CHECK_NULL(out_object);
     auto* bv = static_cast<BridgeValue*>(value);
+    if (exceeds_max_depth(bv->value.current_depth(), max_depth)) return SIMDJSON_BRIDGE_ERR_DEPTH;
     try {
         auto* bo = new BridgeObject();
         auto err = bv->value.get_object().get(bo->object);

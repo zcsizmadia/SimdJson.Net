@@ -107,11 +107,11 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetArray")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    internal static partial int DocumentGetArray(nint doc, out nint outArray);
+    internal static partial int DocumentGetArray(nint doc, nuint maxDepth, out nint outArray);
 
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetObject")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    internal static partial int DocumentGetObject(nint doc, out nint outObject);
+    internal static partial int DocumentGetObject(nint doc, nuint maxDepth, out nint outObject);
 
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_DocumentGetFieldByKey")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
@@ -173,11 +173,11 @@ internal static unsafe partial class NativeMethods
 
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetArray")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    internal static partial int ValueGetArray(nint value, out nint outArray);
+    internal static partial int ValueGetArray(nint value, nuint maxDepth, out nint outArray);
 
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetObject")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]
-    internal static partial int ValueGetObject(nint value, out nint outObject);
+    internal static partial int ValueGetObject(nint value, nuint maxDepth, out nint outObject);
 
     [LibraryImport(Lib, EntryPoint = "SimdJsonNative_ValueGetFieldByKey")]
     [UnmanagedCallConv(CallConvs = [typeof(System.Runtime.CompilerServices.CallConvCdecl)])]

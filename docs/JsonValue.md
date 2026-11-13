@@ -38,8 +38,8 @@ Represents a JSON value at a specific position in an On-Demand document. Can be 
 
 | Member | Description |
 |--------|-------------|
-| `GetArray()` | As [`JsonArray`](JsonArray.md) (throws if not an array) |
-| `GetObject()` | As [`JsonObject`](JsonObject.md) (throws if not an object) |
+| `GetArray()` | As [`JsonArray`](JsonArray.md) (throws if not an array; `-12` if nested `MaxDepth` deep) |
+| `GetObject()` | As [`JsonObject`](JsonObject.md) (throws if not an object; `-12` if nested `MaxDepth` deep) |
 
 ## Field / pointer lookup *(value must be an object)*
 
