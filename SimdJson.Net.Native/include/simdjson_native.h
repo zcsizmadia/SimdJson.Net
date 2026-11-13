@@ -249,13 +249,13 @@ SJNATIVE_API void SJNATIVE_CALL SimdJsonNative_DestroyDocument(SimdJsonDocument 
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetType(
     SimdJsonDocument doc, SimdJsonType* out_type);
 
-/** Gets the root as an array iterator. */
+/** Gets the root as an array iterator. Fails with a depth error if the root's depth is at least max_depth. */
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetArray(
-    SimdJsonDocument doc, SimdJsonArray* out_array);
+    SimdJsonDocument doc, size_t max_depth, SimdJsonArray* out_array);
 
-/** Gets the root as an object iterator. */
+/** Gets the root as an object iterator. Fails with a depth error if the root's depth is at least max_depth. */
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetObject(
-    SimdJsonDocument doc, SimdJsonObject* out_object);
+    SimdJsonDocument doc, size_t max_depth, SimdJsonObject* out_object);
 
 /** Gets a field of the root object by key (order-insensitive lookup). */
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_DocumentGetFieldByKey(
@@ -303,11 +303,13 @@ SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetBool(
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueIsNull(
     SimdJsonValue value, int32_t* out_is_null);
 
+/** Opens the value as an array. Fails with a depth error if the value's depth is at least max_depth. */
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetArray(
-    SimdJsonValue value, SimdJsonArray* out_array);
+    SimdJsonValue value, size_t max_depth, SimdJsonArray* out_array);
 
+/** Opens the value as an object. Fails with a depth error if the value's depth is at least max_depth. */
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetObject(
-    SimdJsonValue value, SimdJsonObject* out_object);
+    SimdJsonValue value, size_t max_depth, SimdJsonObject* out_object);
 
 /** Gets a child field by key from a value that is an object. */
 SJNATIVE_API SimdJsonError SJNATIVE_CALL SimdJsonNative_ValueGetFieldByKey(

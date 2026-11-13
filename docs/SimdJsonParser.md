@@ -38,7 +38,7 @@ All `Parse` methods return a `JsonDocument` that **must be disposed**.
 |--------|-------------|
 | `Capacity` | Current internal buffer size in bytes; `0` before the first parse |
 | `MaxCapacity` *(get/set)* | Maximum allowed document size in bytes |
-| `MaxDepth` | Maximum JSON nesting depth the parser supports; set it with `Allocate` |
+| `MaxDepth` | Maximum JSON nesting depth (default 1024); opening a container this deep throws `-12`. Set it with `Allocate` |
 | `AllowNanInfinity` *(get/set)* | Accept `NaN`, `Infinity` and `-Infinity` as numbers; default `false`. See [Numbers](Numbers.md#nan-and-infinity) |
 | `Allocate(nuint capacity, nuint maxDepth = 1024)` | Pre-allocates buffers for a document size and nesting depth |
 
@@ -73,7 +73,9 @@ finally
 
 Calling `Allocate` up front avoids the reallocation that the first large parse would otherwise trigger, which is worth doing when you know the working document size in advance.
 
-It also sets `MaxDepth`. Be aware of how narrow that guarantee is: simdjson consults the depth limit when walking JSONPath wildcards, where exceeding it raises error `-12` instead of recursing. Depth is not otherwise enforced during ordinary parsing in release builds of the native library, because simdjson compiles those checks out. Bound untrusted input with `capacity` and `MaxCapacity`, not with depth alone.
+It also sets `MaxDepth` (default 1024). The root counts as depth 1. Opening an object or array at depth `MaxDepth` or deeper with `GetArray`/`GetObject` throws error `-12`, and so does a JSONPath wildcard that walks past it. simdjson itself only checks depth in development builds, so the wrapper enforces it when a container is opened. Containers that are skipped rather than opened are not checked, so bound untrusted input by size as well, with `capacity` and `MaxCapacity`.
+
+`Allocate` throws `InvalidOperationException` while a document from the parser is alive, because reallocating would free the buffers that document reads from. simdjson only reallocates when the capacity or depth grows: once the parser has buffers of at least `capacity` bytes, a smaller `maxDepth` leaves `MaxDepth` unchanged. Use a new parser to lower it.
 
 ```csharp
 using var parser = new SimdJsonParser();

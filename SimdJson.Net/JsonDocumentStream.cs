@@ -102,7 +102,7 @@ public sealed class JsonDocumentStream : IDisposable
             return false;
         }
 
-        _current = new JsonDocument(docHandle, parser: null, _parser.AllowNanInfinity);
+        _current = new JsonDocument(docHandle, parser: null, _parser.AllowNanInfinity, _parser.CurrentMaxDepth);
         return true;
     }
 

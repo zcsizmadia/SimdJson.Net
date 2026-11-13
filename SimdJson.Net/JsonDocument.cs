@@ -18,14 +18,21 @@ public sealed class JsonDocument : IDisposable
     private readonly bool _pinned;
     private bool _disposed;
 
-    internal JsonDocument(nint handle, SimdJsonParser? parser, bool allowNanInfinity = false)
+    internal JsonDocument(nint handle, SimdJsonParser? parser, bool allowNanInfinity = false,
+        nuint maxDepth = DefaultMaxDepth)
     {
         Handle = handle;
         _parser = parser;
         AllowNanInfinity = parser?.AllowNanInfinity ?? allowNanInfinity;
+        MaxDepth = parser?.CurrentMaxDepth ?? maxDepth;
     }
 
     internal bool AllowNanInfinity { get; }
+
+    /// <summary>simdjson's default maximum nesting depth.</summary>
+    internal const nuint DefaultMaxDepth = 1024;
+
+    internal nuint MaxDepth { get; }
 
     /// <summary>
     /// Creates a document that borrows a caller-owned buffer. The pin is released on dispose;
@@ -55,7 +62,7 @@ public sealed class JsonDocument : IDisposable
     public JsonArray GetArray()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetArray(Handle, out var h));
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetArray(Handle, MaxDepth, out var h));
         return new JsonArray(h, this);
     }
 
@@ -63,7 +70,7 @@ public sealed class JsonDocument : IDisposable
     public JsonObject GetObject()
     {
         ObjectDisposedException.ThrowIf(_disposed, this);
-        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetObject(Handle, out var h));
+        SimdJsonException.ThrowIfError(NativeMethods.DocumentGetObject(Handle, MaxDepth, out var h));
         return new JsonObject(h, this);
     }
 

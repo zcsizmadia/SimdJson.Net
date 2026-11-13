@@ -31,7 +31,7 @@ simdjson (C++, FetchContent) ──► SimdJsonNative.dll  (C ABI bridge, CMake)
 | `SimdJson.Net.Benchmark/` | BenchmarkDotNet suites: parse, field access, full traversal, NDJSON |
 | `NupkgValidator/` | Consumes the freshly built package and loads the native library on each RID |
 | `.github/workflows/release.yml` | Publishes to NuGet.org and GitHub Packages when a release is published |
-| `SimdJson.Net.Tests/*.cs` | TUnit tests, one file per topic (527 per target framework, 1,581 across net8/net10/net11) |
+| `SimdJson.Net.Tests/*.cs` | TUnit tests, one file per topic (544 per target framework, 1,632 across net8/net10/net11) |
 | `Samples/0N-Name/Program.cs` | 13 standalone demo apps |
 | `docs/` | Per-type API reference; `docs/API.md` is the index |
 | `.github/workflows/build.yml` | CI: builds native libs for 8 RIDs, then runs .NET tests |
@@ -98,6 +98,10 @@ When a lookup fails, simdjson's `json_iterator::abandon()` sets the document's d
 Two consequences of the `BridgeDocument` shape worth knowing:
 
 - Always go through `bd->doc`, never `bd->owned`, except when assigning the result of `iterate`.
+- Bridge functions that open a container (`get_array`/`get_object`) take the caller's `max_depth` and
+  check it with `exceeds_max_depth` first. simdjson only enforces depth under
+  `SIMDJSON_DEVELOPMENT_CHECKS`, and a value cannot reach its parser's `max_depth`, so the managed
+  side passes `JsonDocument.MaxDepth`, captured from `SimdJsonParser` when the document is created.
 - Root scalar getters must use the `DOC_SCALAR` macro. Stream documents are read through
   `document_reference`, whose getters skip the trailing-content check, because the bytes after a
   stream document are simply the next document. Calling `bd->doc->get_int64()` directly on a stream
