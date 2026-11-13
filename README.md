@@ -3,7 +3,7 @@
 [![Build](https://github.com/zcsizmadia/SimdJson.Net/actions/workflows/build.yml/badge.svg?branch=main)](https://github.com/zcsizmadia/SimdJson.Net/actions/workflows/build.yml)
 [![NuGet](https://img.shields.io/nuget/v/SimdJson.Net.svg?logo=nuget&label=NuGet)](https://www.nuget.org/packages/SimdJson.Net)
 [![Downloads](https://img.shields.io/nuget/dt/SimdJson.Net.svg?logo=nuget&label=Downloads)](https://www.nuget.org/packages/SimdJson.Net)
-[![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%209.0%20%7C%2010.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
+[![.NET](https://img.shields.io/badge/.NET-8.0%20%7C%2010.0-512BD4?logo=dotnet&logoColor=white)](https://dotnet.microsoft.com/)
 [![simdjson](https://img.shields.io/badge/simdjson-5.1.1-0A7BBB)](https://github.com/simdjson/simdjson/releases/tag/v5.1.1)
 [![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
@@ -69,6 +69,8 @@ Console.WriteLine(SimdJsonParser.GetVersion()); // e.g. "5.1.1"
 ```bash
 dotnet add package SimdJson.Net
 ```
+
+The package targets `net8.0` and `net10.0`, so it also runs on .NET 9 (using the `net8.0` build) and on .NET 11 (using the `net10.0` build). CI runs the test suite on .NET 8, 10 and 11.
 
 ## Documentation
 
@@ -138,7 +140,7 @@ cmake --build   SimdJson.Net.Native/build
 cmake --install SimdJson.Net.Native/build
 ```
 
-Then `dotnet build` / `dotnet test` as normal.
+Then `dotnet build` / `dotnet test` as normal. The tests target `net8.0`, `net10.0` and `net11.0`, so building them needs the .NET 11 SDK, and running them needs the .NET 8, 10 and 11 runtimes.
 
 ## Supported Runtimes
 
