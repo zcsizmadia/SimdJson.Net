@@ -17,6 +17,7 @@ jobs:
       actions: read     # To download from build.yml
       contents: write   # To upload assets to the Release
       packages: write   # To push to GitHub Packages
+      id-token: write   # For NuGet trusted publishing (OIDC)
 
     steps:
       - uses: actions/checkout@v7
@@ -74,11 +75,19 @@ jobs:
         run: |
           gh release upload ${{ github.event.release.tag_name }} "$TARGET_NUPKG"
 
+      # Trusted publishing: exchanges the job's OIDC token for a short-lived API key. Needs a
+      # nuget.org policy for this repository and release.yml, with no environment.
+      - name: NuGet login
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: zcsizmadia
+
       - name: Publish to NuGet.org
         shell: bash
         run: |
           dotnet nuget push "$TARGET_NUPKG" \
-            --api-key "${{ secrets.NUGET_API_KEY }}" \
+            --api-key "${{ steps.nuget-login.outputs.NUGET_API_KEY }}" \
             --source https://api.nuget.org/v3/index.json \
             --skip-duplicate
 
